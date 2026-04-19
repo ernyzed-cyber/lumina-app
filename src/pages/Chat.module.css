@@ -237,6 +237,26 @@
   z-index: 10;
 }
 
+.headerAvatarBtn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  border-radius: 50%;
+  transition: transform var(--duration-fast) ease, box-shadow var(--duration-fast) ease;
+}
+
+.headerAvatarBtn:hover {
+  transform: scale(1.05);
+  box-shadow: 0 0 0 3px var(--border-default);
+}
+
+.headerAvatarBtn:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px var(--accent-purple);
+}
+
+
 .chatHeaderInfo {
   flex: 1;
   min-width: 0;

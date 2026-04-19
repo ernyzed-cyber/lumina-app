@@ -105,7 +105,7 @@ const PROFILE_STORAGE_KEY = 'profileData';
 
 /** Validation limits for numeric profile fields */
 const FIELD_LIMITS: Record<string, { min: number; max: number }> = {
-  age: { min: 14, max: 100 },
+  age: { min: 18, max: 100 },
   height: { min: 100, max: 250 },
   weight: { min: 30, max: 300 },
 };

@@ -380,6 +380,10 @@ export default function Search() {
           girl={selectedGirl}
           onClose={closeDrawer}
           t={drawerLabels}
+          onChat={(g) => {
+            closeDrawer();
+            navigate(`/chat?girl=${g.id}`);
+          }}
         />
       </div>
     </PageTransition>

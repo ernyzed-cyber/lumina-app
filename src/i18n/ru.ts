@@ -348,6 +348,14 @@ const ru: Translations = {
       sectionDesc: 'Язык интерфейса приложения',
       interfaceLanguage: 'Язык интерфейса',
     },
+    appearance: {
+      sectionTitle: 'Внешний вид',
+      sectionDesc: 'Выберите тему оформления',
+      themeLabel: 'Тема',
+      themeLight: 'Светлая',
+      themeDark: 'Тёмная',
+      themeSystem: 'Системная',
+    },
     data: {
       sectionTitle: 'Данные',
       sectionDesc: 'Управление вашими данными',

@@ -703,12 +703,19 @@ export default function Chat() {
               <Menu size={20} />
             </button>
 
-            <Avatar
-              src={currentGirl.photo}
-              alt={currentGirl.name}
-              size="sm"
-              online={currentGirl.online}
-            />
+            <button
+              type="button"
+              className={s.headerAvatarBtn}
+              onClick={() => setDrawerOpen(true)}
+              aria-label={t('chat.viewFullProfile')}
+            >
+              <Avatar
+                src={currentGirl.photo}
+                alt={currentGirl.name}
+                size="sm"
+                online={currentGirl.online}
+              />
+            </button>
 
             <div className={s.chatHeaderInfo}>
               <div className={s.chatHeaderName}>{currentGirl.name}</div>
@@ -1060,6 +1067,7 @@ export default function Chat() {
         girl={currentGirl ?? null}
         onClose={() => setDrawerOpen(false)}
         t={drawerLabels}
+        hideActionBar
       />
 
       <VerificationModal

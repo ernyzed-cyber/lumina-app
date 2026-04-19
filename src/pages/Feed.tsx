@@ -838,6 +838,43 @@ export default function Feed() {
           girl={selectedGirl}
           onClose={closeDrawer}
           t={drawerLabels}
+          onChat={(g) => {
+            closeDrawer();
+            navigate(`/chat?girl=${g.id}`);
+          }}
+          onLike={(g) => {
+            if (telegramVerified === false) {
+              closeDrawer();
+              setVerifyModalOpen(true);
+              return;
+            }
+            if (likesLeft <= 0) {
+              setPaywallType('likes');
+              closeDrawer();
+              return;
+            }
+            setLimits((prev) => ({ ...prev, likes: prev.likes + 1 }));
+            syncLike(g.id);
+            closeDrawer();
+            const delay = MATCH_DELAY_MIN + Math.random() * (MATCH_DELAY_MAX - MATCH_DELAY_MIN);
+            setTimeout(() => setMatchGirl(g), delay);
+          }}
+          onSuperLike={(g) => {
+            if (telegramVerified === false) {
+              closeDrawer();
+              setVerifyModalOpen(true);
+              return;
+            }
+            if (superLikesLeft <= 0) {
+              setPaywallType('superLikes');
+              closeDrawer();
+              return;
+            }
+            setLimits((prev) => ({ ...prev, superLikes: prev.superLikes + 1 }));
+            syncLike(g.id);
+            closeDrawer();
+            setTimeout(() => setMatchGirl(g), 1500);
+          }}
         />
       </div>
     </PageTransition>

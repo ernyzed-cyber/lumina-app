@@ -18,6 +18,25 @@
     <link rel="manifest" href="/manifest.json" />
 
     <title>Lumina — Знакомства</title>
+
+    <!-- Theme pre-apply (avoids FOUC) -->
+    <script>
+      (function () {
+        try {
+          var saved = localStorage.getItem('lumina_theme');
+          var resolved;
+          if (saved === 'light' || saved === 'dark') {
+            resolved = saved;
+          } else {
+            resolved = window.matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark';
+          }
+          document.documentElement.setAttribute('data-theme', resolved);
+          document.documentElement.style.colorScheme = resolved;
+        } catch (e) {
+          document.documentElement.setAttribute('data-theme', 'dark');
+        }
+      })();
+    </script>
   </head>
   <body>
     <div id="root"></div>

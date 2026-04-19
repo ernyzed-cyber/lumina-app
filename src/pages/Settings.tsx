@@ -12,11 +12,17 @@ import {
   Trash2,
   Crown,
   LogOut,
+  Palette,
+  Sun,
+  Moon,
+  Monitor,
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import PageTransition from '../components/layout/PageTransition';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
+import { useTheme } from '../hooks/useTheme';
+import type { Theme } from '../hooks/useTheme';
 import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { storage } from '../utils/helpers';
@@ -121,6 +127,7 @@ export default function Settings() {
   const { showToast, ToastContainer } = useToast();
   const navigate = useNavigate();
   const { t, lang, setLang } = useLanguage();
+  const { theme, setTheme } = useTheme();
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
@@ -383,6 +390,44 @@ export default function Settings() {
               id="toggle-online-status"
               aria-describedby="label-online-status desc-online-status"
             />
+          </div>
+        </motion.div>
+
+        {/* ════════ Внешний вид ════════ */}
+        <motion.div
+          className={s.section}
+          initial="hidden"
+          animate="visible"
+          custom={2.5}
+          variants={fadeUp}
+        >
+          <div className={s.sectionHeader}>
+            <div className={s.sectionIcon}>
+              <Palette size={18} />
+            </div>
+            <div>
+              <h3 className={s.sectionTitle}>{t('settings.appearance.sectionTitle')}</h3>
+              <p className={s.sectionDesc}>{t('settings.appearance.sectionDesc')}</p>
+            </div>
+          </div>
+
+          <div className={s.themeGrid}>
+            {([
+              { value: 'light', label: t('settings.appearance.themeLight'), icon: <Sun size={18} /> },
+              { value: 'dark', label: t('settings.appearance.themeDark'), icon: <Moon size={18} /> },
+              { value: 'system', label: t('settings.appearance.themeSystem'), icon: <Monitor size={18} /> },
+            ] as { value: Theme; label: string; icon: React.ReactNode }[]).map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                className={`${s.themeOption} ${theme === opt.value ? s.themeOptionActive : ''}`}
+                onClick={() => setTheme(opt.value)}
+                aria-pressed={theme === opt.value}
+              >
+                <span className={s.themeOptionIcon}>{opt.icon}</span>
+                <span className={s.themeOptionLabel}>{opt.label}</span>
+              </button>
+            ))}
           </div>
         </motion.div>
 

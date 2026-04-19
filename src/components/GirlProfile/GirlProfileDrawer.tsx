@@ -86,6 +86,8 @@ interface Props {
   onChat?: (girl: Girl) => void;
   onLike?: (girl: Girl) => void;
   onSuperLike?: (girl: Girl) => void;
+  /** Hide the sticky action bar (chat / like / super-like). Useful when opened from within Chat page. */
+  hideActionBar?: boolean;
 }
 
 /* ── Helpers ── */
@@ -213,7 +215,7 @@ const modalVariants = {
 
 /* ── Main component ── */
 
-export default function GirlProfileDrawer({ open, girl, onClose, t, onChat, onLike, onSuperLike }: Props) {
+export default function GirlProfileDrawer({ open, girl, onClose, t, onChat, onLike, onSuperLike, hideActionBar }: Props) {
   const navigate = useNavigate();
 
   if (!girl) return null;
@@ -442,29 +444,31 @@ export default function GirlProfileDrawer({ open, girl, onClose, t, onChat, onLi
             </div>
 
             {/* ── Sticky action bar ── */}
-            <div className={styles.actionBar}>
-              <button className={styles.actionBtn} type="button" aria-label="Chat" onClick={() => { if (onChat && girl) onChat(girl); else onClose(); }}>
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
-                </svg>
-              </button>
-              <button className={`${styles.actionBtn} ${styles.actionLike}`} type="button" aria-label="Like" onClick={() => { if (onLike && girl) onLike(girl); }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
-                </svg>
-              </button>
-              <button className={`${styles.actionBtn} ${styles.actionFire}`} type="button" aria-label="Super Like" onClick={() => { if (onSuperLike && girl) onSuperLike(girl); else { onClose(); navigate('/premium'); } }}>
-                <svg width="28" height="28" viewBox="0 0 24 24" fill="url(#fireGrad)">
-                  <defs>
-                    <linearGradient id="fireGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                      <stop offset="0%" stopColor="#F97316" />
-                      <stop offset="100%" stopColor="#EC4899" />
-                    </linearGradient>
-                  </defs>
-                  <path d="M12 2c.5 4-2 6-2 10 0 2.5 2 4 4 4s4-1.5 4-4c0-6-6-10-6-10zm-2 16c-1.5 0-3-1-3-3 0-2 1.5-3 3-4 1.5 1 3 2 3 4s-1.5 3-3 3z" />
-                </svg>
-              </button>
-            </div>
+            {!hideActionBar && (
+              <div className={styles.actionBar}>
+                <button className={styles.actionBtn} type="button" aria-label="Chat" onClick={() => { if (onChat && girl) onChat(girl); else onClose(); }}>
+                  <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z" />
+                  </svg>
+                </button>
+                <button className={`${styles.actionBtn} ${styles.actionLike}`} type="button" aria-label="Like" onClick={() => { if (onLike && girl) onLike(girl); }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />
+                  </svg>
+                </button>
+                <button className={`${styles.actionBtn} ${styles.actionFire}`} type="button" aria-label="Super Like" onClick={() => { if (onSuperLike && girl) onSuperLike(girl); else { onClose(); navigate('/premium'); } }}>
+                  <svg width="28" height="28" viewBox="0 0 24 24" fill="url(#fireGrad)">
+                    <defs>
+                      <linearGradient id="fireGrad" x1="0%" y1="100%" x2="100%" y2="0%">
+                        <stop offset="0%" stopColor="#F97316" />
+                        <stop offset="100%" stopColor="#EC4899" />
+                      </linearGradient>
+                    </defs>
+                    <path d="M12 2c.5 4-2 6-2 10 0 2.5 2 4 4 4s4-1.5 4-4c0-6-6-10-6-10zm-2 16c-1.5 0-3-1-3-3 0-2 1.5-3 3-4 1.5 1 3 2 3 4s-1.5 3-3 3z" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </motion.div>
         </motion.div>
       )}

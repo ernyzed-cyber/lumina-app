@@ -346,6 +346,14 @@ const en = {
       sectionDesc: 'App interface language',
       interfaceLanguage: 'Interface language',
     },
+    appearance: {
+      sectionTitle: 'Appearance',
+      sectionDesc: 'Choose your theme',
+      themeLabel: 'Theme',
+      themeLight: 'Light',
+      themeDark: 'Dark',
+      themeSystem: 'System',
+    },
     data: {
       sectionTitle: 'Data',
       sectionDesc: 'Manage your data',
