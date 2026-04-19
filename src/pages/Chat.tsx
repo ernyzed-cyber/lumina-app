@@ -506,7 +506,11 @@ export default function Chat() {
           }),
         });
 
-        if (!res.ok) throw new Error('API error');
+        if (!res.ok) {
+          const errText = await res.text().catch(() => '');
+          console.error('[chat-ai] API error', res.status, errText);
+          throw new Error('API error');
+        }
 
         const data = await res.json();
         const reply = data?.reply
@@ -531,7 +535,8 @@ export default function Chat() {
               : d,
           ),
         );
-      } catch {
+      } catch (err) {
+        console.error('[chat-ai] fallback triggered:', err);
         const fallbackReplies: string[] = tr.chat.fallbackReplies;
         const fallback = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
 
