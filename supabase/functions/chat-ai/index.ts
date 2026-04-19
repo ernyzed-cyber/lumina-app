@@ -32,7 +32,7 @@ const CORS_HEADERS: Record<string, string> = {
 };
 
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 const MEMORY_LIMIT = 3; // сколько прошлых резюме подтягивать
 const SUMMARY_TRIGGER = 6; // каждые N сообщений создавать новое воспоминание
 
@@ -237,7 +237,7 @@ Deno.serve(async (req: Request) => {
 
     const reply = await callGroq(apiKey, finalMessages, {
       temperature: 0.9,
-      max_tokens: 300,
+      max_tokens: 150,
     });
 
     // -----------------------------------------------------------------------
