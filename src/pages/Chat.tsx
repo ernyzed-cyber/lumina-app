@@ -50,14 +50,6 @@ const WARN_CHARS = 400;
 const DAILY_MESSAGE_LIMIT = 100;
 const MSG_LIMIT_KEY = 'dailyMsgLimits';
 
-/* ── AI personality prompts ── */
-const PERSONALITY_PROMPTS: Record<string, string> = {
-  romantic: 'Be romantic: use compliments, affectionate words, and gentle hints.',
-  playful: 'Be playful: joke around, tease lightly, use emojis and light flirting.',
-  mysterious: 'Be mysterious: be a bit enigmatic, intriguing, leave things unsaid.',
-  confident: 'Be confident: be straightforward, know your worth, slightly bold.',
-  shy: 'Be shy: be a little bashful, use ellipses, be cute and timid.',
-};
 
 /* ── Emoji data (emojis themselves are not translatable) ── */
 const EMOJI_DATA: { key: string; emojis: string[] }[] = [
@@ -551,7 +543,7 @@ export default function Chat() {
         setTimeout(() => setIsTyping(false), 400);
       }
     },
-    [input, currentGirl, messages, session, saveMessage, aiPersonality, messagesLeft, t, tr],
+    [input, currentGirl, messages, session, saveMessage, messagesLeft, t, tr],
   );
 
   /* ── Enter to send ── */
