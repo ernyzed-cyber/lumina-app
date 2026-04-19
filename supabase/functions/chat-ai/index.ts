@@ -2,9 +2,6 @@
 // Прокси к Groq API (модель llama-3.1-8b-instant).
 // Secret GROQ_API_KEY должен быть установлен в Supabase Dashboard → Edge Functions → Secrets.
 
-// @ts-expect-error — Deno runtime types не резолвятся в Vite/Node окружении
-import { serve } from 'https://deno.land/std@0.224.0/http/server.ts';
-
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
   content: string;
@@ -25,7 +22,7 @@ const CORS_HEADERS: Record<string, string> = {
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 
-serve(async (req: Request) => {
+Deno.serve(async (req: Request) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: CORS_HEADERS });
@@ -39,7 +36,6 @@ serve(async (req: Request) => {
   }
 
   try {
-    // @ts-expect-error — Deno глобал в Edge Runtime
     const apiKey = Deno.env.get('GROQ_API_KEY');
     if (!apiKey) {
       return new Response(
@@ -102,8 +98,7 @@ serve(async (req: Request) => {
     }
 
     const data = await groqRes.json();
-    const reply: string =
-      data?.choices?.[0]?.message?.content?.trim() ?? '';
+    const reply: string = data?.choices?.[0]?.message?.content?.trim() ?? '';
 
     return new Response(
       JSON.stringify({
