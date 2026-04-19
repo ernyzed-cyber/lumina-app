@@ -1,14 +1,12 @@
 // Supabase Edge Function: chat-ai
-// "Живая" девушка: грузит персонажа из girl_personas, профиль собеседника
-// из profiles, последние воспоминания из memories, собирает мегапромпт,
-// вызывает OpenRouter (с fallback-цепочкой моделей), возвращает ответ.
-// Асинхронно создаёт новое воспоминание каждые SUMMARY_TRIGGER сообщений.
+// Gemini 2.0 Flash (Google AI Studio) — бесплатно, 15 RPM, 1M токенов/день.
+// Грузит персонажа из girl_personas, профиль из profiles, воспоминания из memories.
+// Асинхронно сохраняет резюме диалога в memories каждые SUMMARY_TRIGGER сообщений.
 //
-// Secrets (настраиваются в Supabase Dashboard -> Edge Functions -> Secrets):
-//   OPENROUTER_API_KEY  -- ключ OpenRouter (sk-or-...)
-// Автоматически доступны:
-//   SUPABASE_URL
-//   SUPABASE_SERVICE_ROLE_KEY
+// Secrets:
+//   GOOGLE_AI_KEY          -- ключ Google AI Studio (AIza...)
+//   SUPABASE_URL           -- автоматически
+//   SUPABASE_SERVICE_ROLE_KEY -- автоматически
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -31,24 +29,10 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-
-// Fallback-цепочка: OpenRouter попробует каждую модель по очереди при 429/5xx.
-// Если первая рейтлимитит — автоматически переключается на следующую.
-// Порядок: от лучшего качества к запасным.
-// OpenRouter разрешает максимум 3 модели в fallback-массиве.
-const MODELS = [
-  'meta-llama/llama-3.3-70b-instruct:free',
-  'qwen/qwen3-next-80b-a3b-instruct:free',
-  'google/gemma-3-27b-it:free',
-  'google/gemma-3-12b-it:free',
-];
-// Модель-репортер для саммари (короткие тексты, подойдёт любая быстрая).
-const SUMMARY_MODELS = [
-  'google/gemma-3-12b-it:free',
-  'meta-llama/llama-3.2-3b-instruct:free',
-  'google/gemma-3-4b-it:free',
-];
+// Gemini 2.0 Flash — бесплатно, быстро, отлично понимает русский
+const GEMINI_MODEL = 'gemini-2.0-flash';
+const GEMINI_URL = (model: string, key: string) =>
+  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
 
 const MEMORY_LIMIT = 3;
 const SUMMARY_TRIGGER = 6;
@@ -64,75 +48,59 @@ function json(status: number, data: unknown): Response {
   });
 }
 
-async function callOpenRouter(
+// Gemini использует другой формат: system отдельно, history как contents[]
+// role: 'model' вместо 'assistant'
+async function callGemini(
   apiKey: string,
-  model: string,
   messages: ChatMessage[],
-  opts: { temperature?: number; max_tokens?: number; fallbackModels?: string[] },
-): Promise<{ reply: string; model: string; raw: unknown }> {
+  opts: { temperature?: number; maxOutputTokens?: number } = {},
+): Promise<string> {
+  // Вытащим system prompt если есть
+  const systemMsg = messages.find((m) => m.role === 'system');
+  const chatMessages = messages.filter((m) => m.role !== 'system');
+
+  // Конвертируем в формат Gemini
+  const contents = chatMessages.map((m) => ({
+    role: m.role === 'assistant' ? 'model' : 'user',
+    parts: [{ text: m.content }],
+  }));
+
   const body: Record<string, unknown> = {
-    model,
-    messages,
-    temperature: opts.temperature ?? 0.85,
-    max_tokens: opts.max_tokens ?? 250,
-  };
-  if (opts.fallbackModels && opts.fallbackModels.length > 0) {
-    body.models = [model, ...opts.fallbackModels].slice(0, 3);
-  }
-  const res = await fetch(OPENROUTER_URL, {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://lumina-app-eight-sable.vercel.app',
-      'X-Title': 'Lumina',
+    contents,
+    generationConfig: {
+      temperature: opts.temperature ?? 0.9,
+      maxOutputTokens: opts.maxOutputTokens ?? 300,
     },
+  };
+
+  if (systemMsg) {
+    body.systemInstruction = {
+      parts: [{ text: systemMsg.content }],
+    };
+  }
+
+  const res = await fetch(GEMINI_URL(GEMINI_MODEL, apiKey), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
+
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`OpenRouter ${res.status}: ${text}`);
+    throw new Error(`Gemini ${res.status}: ${text}`);
   }
-  const data = await res.json();
-  const reply = (data?.choices?.[0]?.message?.content ?? '').trim();
-  const usedModel = data?.model ?? model;
-  return { reply, model: usedModel, raw: data };
-}
 
-async function callLLM(
-  apiKey: string,
-  messages: ChatMessage[],
-  opts: {
-    temperature?: number;
-    max_tokens?: number;
-    models?: string[];
-  } = {},
-): Promise<{ reply: string; model: string }> {
-  const models = opts.models ?? MODELS;
-  // Пробуем каждую модель отдельно. Если модель вернула пустой ответ
-  // или упала — идём к следующей. Это надёжнее чем передавать массив
-  // `models` в OpenRouter, так как там иногда пустой content приходит.
-  let lastErr: unknown = null;
-  for (const model of models) {
-    try {
-      const result = await callOpenRouter(apiKey, model, messages, {
-        temperature: opts.temperature,
-        max_tokens: opts.max_tokens,
-      });
-      if (result.reply && result.reply.length > 0) {
-        return { reply: result.reply, model: result.model };
-      }
-      console.warn(
-        `[chat-ai] empty reply from ${model}, raw:`,
-        JSON.stringify(result.raw).slice(0, 500),
-      );
-      lastErr = new Error(`Empty reply from ${model}`);
-    } catch (err) {
-      console.warn(`[chat-ai] ${model} failed:`, err);
-      lastErr = err;
-    }
+  const data = await res.json();
+  const reply = (
+    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
+  ).trim();
+
+  if (!reply) {
+    const reason = data?.candidates?.[0]?.finishReason ?? 'unknown';
+    throw new Error(`Gemini empty reply, finishReason: ${reason}`);
   }
-  throw lastErr ?? new Error('All models failed');
+
+  return reply;
 }
 
 function buildUserContextBlock(profile: Record<string, unknown> | null): string {
@@ -188,7 +156,7 @@ async function saveMemoryAsync(
     const transcript = dialog
       .map((m) => `${m.role === 'user' ? 'HE' : 'I'}: ${m.content}`)
       .join('\n');
-    const summaryPrompt: ChatMessage[] = [
+    const summaryMessages: ChatMessage[] = [
       {
         role: 'system',
         content:
@@ -199,10 +167,9 @@ async function saveMemoryAsync(
         content: `Transcript:\n${transcript}\n\nWrite a 2-3 sentence diary entry in Russian.`,
       },
     ];
-    const { reply: summary } = await callLLM(apiKey, summaryPrompt, {
+    const summary = await callGemini(apiKey, summaryMessages, {
       temperature: 0.4,
-      max_tokens: 120,
-      models: SUMMARY_MODELS,
+      maxOutputTokens: 150,
     });
     if (!summary) return;
     await supabase.from('memories').insert({
@@ -229,9 +196,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get('OPENROUTER_API_KEY');
+    const apiKey = Deno.env.get('GOOGLE_AI_KEY');
     if (!apiKey) {
-      return json(500, { error: 'OPENROUTER_API_KEY is not configured' });
+      return json(500, { error: 'GOOGLE_AI_KEY is not configured' });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -295,14 +262,10 @@ Deno.serve(async (req: Request) => {
     }
     finalMessages.push(...messages);
 
-    const { reply, model: usedModel } = await callLLM(apiKey, finalMessages, {
+    const reply = await callGemini(apiKey, finalMessages, {
       temperature: 0.9,
-      max_tokens: 300,
+      maxOutputTokens: 300,
     });
-
-    if (!reply || reply.length === 0) {
-      return json(502, { error: 'Empty reply from all models' });
-    }
 
     if (girlId && userId) {
       const fullDialog: ChatMessage[] = [
@@ -322,7 +285,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return json(200, { reply, model: usedModel });
+    return json(200, { reply, model: GEMINI_MODEL });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[chat-ai] fatal:', message);
