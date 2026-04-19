@@ -1,0 +1,317 @@
+/* ═══════════════════════════════════════════
+   Navbar — Боковая панель / нижняя панель
+   ═══════════════════════════════════════════ */
+
+.navbar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 64px;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 0;
+  gap: 8px;
+  z-index: var(--z-sticky);
+
+  /* Glass-эффект */
+  background: var(--bg-glass);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border-right: 1px solid var(--border-subtle);
+}
+
+/* ── Логотип ── */
+
+.logo {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-md);
+  background: var(--gradient-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 16px;
+  flex-shrink: 0;
+  box-shadow: var(--shadow-glow-mixed);
+}
+
+.logoText {
+  font-family: var(--font-display);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+/* ── Список навигации ── */
+
+.navList {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+}
+
+.navItem {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
+
+/* ── Ссылка ── */
+
+.navLink {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  text-decoration: none;
+  transition:
+    color var(--duration-fast) ease,
+    background var(--duration-fast) ease,
+    transform var(--duration-fast) var(--ease-smooth);
+}
+
+.navLink:hover {
+  color: var(--text-primary);
+  background: rgba(139, 92, 246, 0.08);
+  transform: scale(1.05);
+}
+
+.navLink.active {
+  color: #fff;
+  background: var(--gradient-primary);
+  box-shadow: var(--shadow-glow-mixed);
+}
+
+.navLink.active:hover {
+  transform: scale(1.05);
+}
+
+/* ── Premium-кнопка (градиент с золотом) ── */
+
+.premiumLink {
+  color: #fbbf24;
+}
+
+.premiumLink:hover {
+  color: #f59e0b;
+  background: rgba(251, 191, 36, 0.1);
+}
+
+.premiumLink.active {
+  color: #fff;
+  background: linear-gradient(135deg, #f59e0b, #d97706);
+  box-shadow: 0 0 16px rgba(245, 158, 11, 0.35);
+}
+
+/* ── Иконка-обёртка ── */
+
+.iconWrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ── Бейдж ── */
+
+.badge {
+  position: absolute;
+  top: -6px;
+  right: -8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: var(--radius-full);
+  background: var(--accent-rose);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 18px;
+  text-align: center;
+  box-shadow: 0 0 8px rgba(244, 63, 94, 0.4);
+  pointer-events: none;
+}
+
+/* ── Тултип ── */
+
+.tooltip {
+  position: absolute;
+  left: calc(100% + 12px);
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  color: var(--text-primary);
+  font-size: var(--text-sm);
+  font-family: var(--font-body);
+  white-space: nowrap;
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity var(--duration-fast) ease,
+    visibility var(--duration-fast) ease,
+    transform var(--duration-fast) ease;
+  transform: translateY(-50%) translateX(-4px);
+  z-index: var(--z-tooltip);
+  box-shadow: var(--shadow-md);
+}
+
+.navLink:hover .tooltip {
+  opacity: 1;
+  visibility: visible;
+  transform: translateY(-50%) translateX(0);
+}
+
+/* ── Аватар ── */
+
+.userSection {
+  margin-top: auto;
+  flex-shrink: 0;
+  padding-top: 8px;
+}
+
+.avatarLink {
+  display: block;
+  text-decoration: none;
+}
+
+.avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid transparent;
+  background-origin: border-box;
+  background-clip: padding-box, border-box;
+  background-image:
+    linear-gradient(var(--bg-card), var(--bg-card)),
+    var(--gradient-primary);
+  transition: box-shadow var(--duration-fast) ease;
+}
+
+.avatar:hover {
+  box-shadow: var(--shadow-glow-mixed);
+}
+
+.avatarFallback {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-full);
+  background: var(--gradient-soft);
+  border: 1px solid var(--border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-lavender);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  transition: box-shadow var(--duration-fast) ease;
+}
+
+.avatarFallback:hover {
+  box-shadow: var(--shadow-glow-mixed);
+}
+
+/* ═══════════════════════════════════════════
+   Мобильная версия — нижняя панель
+   ═══════════════════════════════════════════ */
+
+@media (max-width: 768px) {
+  .navbar {
+    top: auto;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 64px;
+    flex-direction: row;
+    padding: 0 8px;
+    gap: 0;
+    border-right: none;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .logo {
+    display: none;
+  }
+
+  .navList {
+    flex-direction: row;
+    flex: 1;
+    justify-content: space-around;
+    gap: 0;
+  }
+
+  .navItem {
+    width: auto;
+    flex: 1;
+  }
+
+  .navLink {
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+    padding: 10px 0;
+  }
+
+  .navLink:hover {
+    background: rgba(139, 92, 246, 0.06);
+    transform: none;
+  }
+
+  .navLink.active {
+    background: transparent;
+    box-shadow: none;
+    color: var(--accent-purple);
+  }
+
+  .navLink.active .iconWrap {
+    color: var(--accent-purple);
+  }
+
+  .premiumLink {
+    color: #fbbf24;
+  }
+
+  .premiumLink:hover {
+    background: rgba(251, 191, 36, 0.06);
+  }
+
+  .premiumLink.active {
+    color: #f59e0b;
+    background: none;
+    box-shadow: none;
+  }
+
+  .tooltip {
+    display: none;
+  }
+
+  .userSection {
+    display: none;
+  }
+
+  .badge {
+    top: -4px;
+    right: -6px;
+    min-width: 16px;
+    height: 16px;
+    font-size: 9px;
+    line-height: 16px;
+    padding: 0 4px;
+  }
+}

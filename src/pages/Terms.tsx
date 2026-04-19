@@ -1,0 +1,325 @@
+import { useEffect } from 'react';
+import { Link } from 'react-router-dom';
+import { ArrowLeft } from 'lucide-react';
+import PageTransition from '../components/layout/PageTransition';
+import { useLanguage } from '../i18n';
+import s from './Legal.module.css';
+
+export default function Terms() {
+  const { lang, t } = useLanguage();
+
+  useEffect(() => {
+    window.scrollTo(0, 0);
+  }, []);
+
+  return (
+    <PageTransition>
+      <div className={s.page}>
+        {/* Top bar */}
+        <div className={s.topBar}>
+          <Link to="/" className={s.backBtn}>
+            <ArrowLeft size={16} />
+            {t('legal.backToHome')}
+          </Link>
+          <span className={s.topLogo}>Lumina</span>
+        </div>
+
+        <main className={s.main}>
+          {/* Header */}
+          <div className={s.header}>
+            <h1 className={s.pageTitle}>{t('legal.terms.pageTitle')}</h1>
+            <p className={s.subtitle}>{t('legal.terms.subtitle')}</p>
+            <span className={s.lastUpdated}>
+              {t('legal.lastUpdated', { date: 'April 12, 2026' })}
+            </span>
+          </div>
+
+          {lang === 'ru' ? <TermsRU /> : <TermsEN />}
+
+          {/* Navigation between legal pages */}
+          <div className={s.legalNav}>
+            <Link to="/terms" className={`${s.legalNavLink} ${s.legalNavLinkActive}`}>
+              {t('landing.footer.termsOfService')}
+            </Link>
+            <Link to="/privacy" className={s.legalNavLink}>
+              {t('landing.footer.privacyPolicy')}
+            </Link>
+            <Link to="/community-guidelines" className={s.legalNavLink}>
+              {t('landing.footer.communityGuidelines')}
+            </Link>
+          </div>
+        </main>
+      </div>
+    </PageTransition>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   English version
+   ═══════════════════════════════════════════ */
+function TermsEN() {
+  return (
+    <div className={s.content}>
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>1. Acceptance of Terms</h2>
+        <p className={s.paragraph}>
+          By accessing or using the Lumina dating application ("Service"), you agree to be bound by these Terms of Service ("Terms"). If you do not agree to these Terms, you may not use the Service. These Terms constitute a legally binding agreement between you and Lumina ("Company," "we," "us," or "our").
+        </p>
+        <p className={s.paragraph}>
+          We reserve the right to modify these Terms at any time. We will notify you of material changes by posting the updated Terms on this page and updating the "Last updated" date. Your continued use of the Service after such changes constitutes acceptance of the new Terms.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>2. Eligibility</h2>
+        <p className={s.paragraph}>
+          You must be at least 18 years of age to create an account and use the Service. By registering, you represent and warrant that:
+        </p>
+        <ul className={s.list}>
+          <li>You are at least 18 years old;</li>
+          <li>You have the legal capacity to enter into a binding agreement;</li>
+          <li>You are not prohibited from using the Service under any applicable laws;</li>
+          <li>You have not been previously removed or banned from the Service;</li>
+          <li>You will comply with these Terms and all applicable local, national, and international laws.</li>
+        </ul>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>3. Account Registration</h2>
+        <p className={s.paragraph}>
+          To use the Service, you must create an account by providing accurate, current, and complete information. You are responsible for maintaining the confidentiality of your login credentials and for all activities that occur under your account.
+        </p>
+        <p className={s.paragraph}>
+          You agree to immediately notify us of any unauthorized use of your account. We are not liable for any loss or damage arising from your failure to protect your account credentials.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>4. User Conduct</h2>
+        <p className={s.paragraph}>
+          You agree not to engage in any of the following prohibited activities:
+        </p>
+        <ul className={s.list}>
+          <li>Posting false, misleading, or inaccurate profile information;</li>
+          <li>Harassing, threatening, stalking, or intimidating other users;</li>
+          <li>Sending spam, unsolicited advertisements, or promotional content;</li>
+          <li>Impersonating any person or entity;</li>
+          <li>Uploading or sharing content that is illegal, obscene, defamatory, or infringes on intellectual property rights;</li>
+          <li>Attempting to gain unauthorized access to the Service or other user accounts;</li>
+          <li>Using the Service for any commercial purposes without prior written consent;</li>
+          <li>Engaging in any activity that interferes with or disrupts the Service.</li>
+        </ul>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>5. Content and Intellectual Property</h2>
+        <p className={s.paragraph}>
+          You retain ownership of any content you submit through the Service. However, by posting content, you grant us a non-exclusive, worldwide, royalty-free license to use, display, reproduce, and distribute your content in connection with operating and promoting the Service.
+        </p>
+        <p className={s.paragraph}>
+          All trademarks, logos, service marks, and trade names displayed on the Service are the property of Lumina or their respective owners. You may not use any of these without prior written permission.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>6. Subscription and Payments</h2>
+        <p className={s.paragraph}>
+          Lumina offers both free and premium (paid) tiers. Premium features require a subscription. Payment terms, pricing, and subscription details are presented at the time of purchase.
+        </p>
+        <ul className={s.list}>
+          <li>Subscriptions automatically renew unless cancelled before the renewal date;</li>
+          <li>Refunds are handled in accordance with the policies of the payment provider (Stripe, YooKassa, etc.);</li>
+          <li>We reserve the right to change pricing with prior notice;</li>
+          <li>Free-tier features and limits may be adjusted at any time.</li>
+        </ul>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>7. Privacy</h2>
+        <p className={s.paragraph}>
+          Your use of the Service is also governed by our <a href="/privacy" style={{ color: 'var(--accent-lavender)' }}>Privacy Policy</a>, which describes how we collect, use, and protect your personal data. Please review it carefully.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>8. Termination</h2>
+        <p className={s.paragraph}>
+          We may suspend or terminate your account at our sole discretion, without prior notice, for conduct that we believe violates these Terms or is harmful to other users, us, or third parties, or for any other reason.
+        </p>
+        <p className={s.paragraph}>
+          You may delete your account at any time through the Profile settings. Upon account deletion, your data will be permanently removed in accordance with our Privacy Policy.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>9. Disclaimers</h2>
+        <p className={s.paragraph}>
+          THE SERVICE IS PROVIDED "AS IS" AND "AS AVAILABLE" WITHOUT WARRANTIES OF ANY KIND, EXPRESS OR IMPLIED. WE DO NOT GUARANTEE THAT THE SERVICE WILL BE UNINTERRUPTED, ERROR-FREE, OR SECURE. WE MAKE NO REPRESENTATIONS ABOUT THE ACCURACY OR RELIABILITY OF ANY CONTENT POSTED BY USERS.
+        </p>
+        <p className={s.paragraph}>
+          Lumina does not conduct background checks on users. You are solely responsible for your interactions with other users. We recommend exercising caution and meeting in public places.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>10. Limitation of Liability</h2>
+        <p className={s.paragraph}>
+          TO THE MAXIMUM EXTENT PERMITTED BY LAW, LUMINA SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, INCLUDING BUT NOT LIMITED TO LOSS OF DATA, REVENUE, OR PROFITS, ARISING FROM YOUR USE OF THE SERVICE.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>11. Governing Law</h2>
+        <p className={s.paragraph}>
+          These Terms shall be governed by and construed in accordance with the laws of the jurisdiction in which the Company is registered, without regard to conflict of law principles.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>12. Contact Us</h2>
+        <div className={s.contactInfo}>
+          <h3 className={s.contactTitle}>Questions about these Terms?</h3>
+          <p className={s.paragraph}>
+            If you have any questions or concerns regarding these Terms of Service, please contact us:
+          </p>
+          <a className={s.contactEmail} href="mailto:legal@lumina.app">legal@lumina.app</a>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════════
+   Russian version
+   ═══════════════════════════════════════════ */
+function TermsRU() {
+  return (
+    <div className={s.content}>
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>1. Принятие условий</h2>
+        <p className={s.paragraph}>
+          Используя приложение Lumina («Сервис»), вы соглашаетесь с настоящими Условиями использования («Условия»). Если вы не согласны с Условиями, вы не вправе пользоваться Сервисом. Настоящие Условия представляют собой юридически обязывающее соглашение между вами и Lumina («Компания», «мы», «нас»).
+        </p>
+        <p className={s.paragraph}>
+          Мы оставляем за собой право изменять настоящие Условия в любое время. Мы уведомим вас о существенных изменениях, опубликовав обновлённые Условия на данной странице и обновив дату «Последнее обновление». Продолжение использования Сервиса после таких изменений означает принятие новых Условий.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>2. Право использования</h2>
+        <p className={s.paragraph}>
+          Для создания аккаунта и использования Сервиса вам должно быть не менее 18 лет. Регистрируясь, вы подтверждаете и гарантируете, что:
+        </p>
+        <ul className={s.list}>
+          <li>Вам исполнилось 18 лет;</li>
+          <li>Вы обладаете правоспособностью для заключения обязывающего соглашения;</li>
+          <li>Вам не запрещено использовать Сервис в соответствии с применимым законодательством;</li>
+          <li>Ваш аккаунт не был ранее удалён или заблокирован;</li>
+          <li>Вы будете соблюдать настоящие Условия и все применимые законы.</li>
+        </ul>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>3. Регистрация аккаунта</h2>
+        <p className={s.paragraph}>
+          Для использования Сервиса необходимо создать аккаунт, предоставив точную, актуальную и полную информацию. Вы несёте ответственность за сохранение конфиденциальности учётных данных и за все действия, совершённые через ваш аккаунт.
+        </p>
+        <p className={s.paragraph}>
+          Вы обязуетесь немедленно уведомить нас о любом несанкционированном использовании вашего аккаунта. Мы не несём ответственности за убытки, возникшие в результате невозможности защитить ваши учётные данные.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>4. Поведение пользователей</h2>
+        <p className={s.paragraph}>
+          Вы обязуетесь не совершать следующих запрещённых действий:
+        </p>
+        <ul className={s.list}>
+          <li>Размещение ложной, вводящей в заблуждение или неточной информации в профиле;</li>
+          <li>Преследование, угрозы, запугивание других пользователей;</li>
+          <li>Рассылка спама, нежелательной рекламы или рекламных материалов;</li>
+          <li>Выдача себя за другое лицо или организацию;</li>
+          <li>Загрузка или распространение незаконного, непристойного, клеветнического контента или контента, нарушающего права интеллектуальной собственности;</li>
+          <li>Попытки несанкционированного доступа к Сервису или аккаунтам других пользователей;</li>
+          <li>Использование Сервиса в коммерческих целях без предварительного письменного согласия;</li>
+          <li>Любые действия, нарушающие работу Сервиса.</li>
+        </ul>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>5. Контент и интеллектуальная собственность</h2>
+        <p className={s.paragraph}>
+          Вы сохраняете право собственности на контент, который размещаете через Сервис. Однако, размещая контент, вы предоставляете нам неисключительную, всемирную, безвозмездную лицензию на использование, отображение, воспроизведение и распространение вашего контента в связи с работой и продвижением Сервиса.
+        </p>
+        <p className={s.paragraph}>
+          Все товарные знаки, логотипы и торговые наименования, отображаемые в Сервисе, являются собственностью Lumina или их соответствующих владельцев. Использование без предварительного письменного разрешения запрещено.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>6. Подписка и платежи</h2>
+        <p className={s.paragraph}>
+          Lumina предлагает как бесплатный, так и премиум (платный) уровни доступа. Премиум-функции требуют подписки. Условия оплаты, цены и детали подписки представлены в момент покупки.
+        </p>
+        <ul className={s.list}>
+          <li>Подписки продлеваются автоматически, если не отменены до даты продления;</li>
+          <li>Возвраты осуществляются в соответствии с политикой платёжного провайдера (Stripe, ЮKassa и др.);</li>
+          <li>Мы оставляем за собой право изменять цены с предварительным уведомлением;</li>
+          <li>Функции и лимиты бесплатного уровня могут быть изменены в любое время.</li>
+        </ul>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>7. Конфиденциальность</h2>
+        <p className={s.paragraph}>
+          Использование Сервиса также регулируется нашей <a href="/privacy" style={{ color: 'var(--accent-lavender)' }}>Политикой конфиденциальности</a>, которая описывает, как мы собираем, используем и защищаем ваши персональные данные. Пожалуйста, внимательно ознакомьтесь с ней.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>8. Прекращение действия</h2>
+        <p className={s.paragraph}>
+          Мы можем приостановить или прекратить действие вашего аккаунта по нашему усмотрению, без предварительного уведомления, за поведение, которое, по нашему мнению, нарушает настоящие Условия или наносит вред другим пользователям, нам или третьим лицам.
+        </p>
+        <p className={s.paragraph}>
+          Вы можете удалить свой аккаунт в любое время через настройки профиля. При удалении аккаунта ваши данные будут безвозвратно удалены в соответствии с нашей Политикой конфиденциальности.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>9. Отказ от гарантий</h2>
+        <p className={s.paragraph}>
+          СЕРВИС ПРЕДОСТАВЛЯЕТСЯ «КАК ЕСТЬ» И «КАК ДОСТУПНО» БЕЗ КАКИХ-ЛИБО ГАРАНТИЙ, ЯВНЫХ ИЛИ ПОДРАЗУМЕВАЕМЫХ. МЫ НЕ ГАРАНТИРУЕМ, ЧТО СЕРВИС БУДЕТ РАБОТАТЬ БЕСПЕРЕБОЙНО, БЕЗ ОШИБОК ИЛИ БЕЗОПАСНО. МЫ НЕ ДЕЛАЕМ ЗАЯВЛЕНИЙ О ТОЧНОСТИ ИЛИ ДОСТОВЕРНОСТИ КОНТЕНТА, РАЗМЕЩЁННОГО ПОЛЬЗОВАТЕЛЯМИ.
+        </p>
+        <p className={s.paragraph}>
+          Lumina не проводит проверку биографий пользователей. Вы несёте единоличную ответственность за свои взаимодействия с другими пользователями. Мы рекомендуем проявлять осторожность и встречаться в общественных местах.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>10. Ограничение ответственности</h2>
+        <p className={s.paragraph}>
+          В МАКСИМАЛЬНОЙ СТЕПЕНИ, ДОПУСКАЕМОЙ ЗАКОНОМ, LUMINA НЕ НЕСЁТ ОТВЕТСТВЕННОСТИ ЗА ЛЮБЫЕ КОСВЕННЫЕ, СЛУЧАЙНЫЕ, СПЕЦИАЛЬНЫЕ, ПОСЛЕДУЮЩИЕ ИЛИ ШТРАФНЫЕ УБЫТКИ, ВКЛЮЧАЯ, НО НЕ ОГРАНИЧИВАЯСЬ, ПОТЕРЕЙ ДАННЫХ, ДОХОДА ИЛИ ПРИБЫЛИ, ВОЗНИКАЮЩИХ В СВЯЗИ С ИСПОЛЬЗОВАНИЕМ СЕРВИСА.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>11. Применимое право</h2>
+        <p className={s.paragraph}>
+          Настоящие Условия регулируются и толкуются в соответствии с законодательством юрисдикции, в которой зарегистрирована Компания, без учёта принципов коллизионного права.
+        </p>
+      </div>
+
+      <div className={s.section}>
+        <h2 className={s.sectionTitle}>12. Свяжитесь с нами</h2>
+        <div className={s.contactInfo}>
+          <h3 className={s.contactTitle}>Вопросы по Условиям использования?</h3>
+          <p className={s.paragraph}>
+            Если у вас есть вопросы или замечания относительно настоящих Условий использования, свяжитесь с нами:
+          </p>
+          <a className={s.contactEmail} href="mailto:legal@lumina.app">legal@lumina.app</a>
+        </div>
+      </div>
+    </div>
+  );
+}

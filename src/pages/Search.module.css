@@ -1,0 +1,298 @@
+/* ═══════════════════════════════════════════
+   LUMINA — Search Page (Gallery + Promo)
+   ═══════════════════════════════════════════ */
+
+/* ── Layout ── */
+.page {
+  display: flex;
+  min-height: 100vh;
+  background: var(--bg-primary);
+}
+
+.main {
+  flex: 1;
+  padding-left: 64px;
+  min-height: 100vh;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  overflow-y: auto;
+}
+
+/* ── Search Container ── */
+.searchContainer {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
+  margin: 0 auto;
+  padding: 24px 24px 40px;
+}
+
+/* ── Header ── */
+.searchHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+}
+
+.searchTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-3xl);
+  font-weight: 700;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  user-select: none;
+}
+
+.filterBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-card);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all var(--duration-normal) var(--ease-smooth);
+}
+
+.filterBtn:hover {
+  border-color: var(--accent-purple);
+  color: var(--text-accent);
+  background: rgba(139, 92, 246, 0.08);
+}
+
+/* ── Gallery Grid ── */
+.galleryGrid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+  width: 100%;
+}
+
+/* ── Gallery Card ── */
+.galleryCard {
+  position: relative;
+  border-radius: var(--radius-xl);
+  overflow: hidden;
+  background: var(--bg-card);
+  cursor: pointer;
+  transition: transform var(--duration-normal) var(--ease-smooth),
+              box-shadow var(--duration-normal) var(--ease-smooth);
+}
+
+.galleryCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+.galleryCardImage {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  object-fit: cover;
+  display: block;
+}
+
+.galleryCardInfo {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 24px 12px 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.65));
+  pointer-events: none;
+}
+
+.galleryCardName {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.galleryCardAge {
+  font-family: var(--font-body);
+  font-size: var(--text-base);
+  font-weight: 600;
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+}
+
+.galleryCardVerified {
+  flex-shrink: 0;
+  filter: drop-shadow(0 0 3px rgba(59, 130, 246, 0.45));
+}
+
+.galleryCardOnline {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--online);
+  box-shadow: 0 0 6px rgba(52, 211, 153, 0.5);
+  flex-shrink: 0;
+  margin-left: 2px;
+}
+
+/* ── Promo Card ── */
+.promoCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 20px 16px;
+  border-radius: var(--radius-xl);
+  cursor: pointer;
+  text-align: center;
+  transition: transform var(--duration-normal) var(--ease-smooth),
+              box-shadow var(--duration-normal) var(--ease-smooth);
+  /* Match gallery card height */
+  min-height: 0;
+  aspect-ratio: 3 / 4;
+}
+
+.promoCard:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+/* Pink variant — "Boost profile" */
+.promoCardPink {
+  background: linear-gradient(135deg, #FDE8F0 0%, #FCE4EC 50%, #F8BBD0 100%);
+  color: #C2185B;
+}
+
+/* Purple variant — "Guaranteed views" */
+.promoCardPurple {
+  background: linear-gradient(135deg, #EDE7F6 0%, #E8DEF8 50%, #D1C4E9 100%);
+  color: #7B1FA2;
+}
+
+.promoIcon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+}
+
+.promoText {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 500;
+  line-height: 1.45;
+  padding: 0 4px;
+}
+
+.promoBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px 20px;
+  border-radius: var(--radius-full);
+  border: none;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity var(--duration-fast) ease;
+}
+
+.promoCardPink .promoBtn {
+  background: rgba(194, 24, 91, 0.15);
+  color: #C2185B;
+}
+
+.promoCardPurple .promoBtn {
+  background: rgba(123, 31, 162, 0.15);
+  color: #7B1FA2;
+}
+
+.promoBtn:hover {
+  opacity: 0.8;
+}
+
+/* ── Empty State ── */
+.galleryEmpty {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.galleryEmptyIcon {
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(139, 92, 246, 0.1);
+  color: var(--text-muted);
+}
+
+.galleryEmptyTitle {
+  font-family: var(--font-display);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.galleryEmptyText {
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  line-height: 1.5;
+}
+
+/* ── Responsive ── */
+@media (max-width: 768px) {
+  .main {
+    padding-left: 0;
+    padding-bottom: 72px;
+  }
+
+  .searchContainer {
+    padding: 16px;
+    max-width: 100%;
+  }
+}
+
+@media (max-width: 400px) {
+  .galleryGrid {
+    gap: 8px;
+  }
+
+  .galleryCardInfo {
+    padding: 20px 10px 8px;
+  }
+
+  .galleryCardName,
+  .galleryCardAge {
+    font-size: var(--text-sm);
+  }
+
+  .promoCard {
+    padding: 14px 10px;
+    gap: 8px;
+  }
+
+  .promoText {
+    font-size: var(--text-xs);
+  }
+}

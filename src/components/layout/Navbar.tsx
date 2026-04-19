@@ -1,0 +1,118 @@
+import { NavLink } from 'react-router-dom';
+import {
+  Heart,
+  Search,
+  MessageCircle,
+  Bell,
+  User,
+  Settings,
+  Crown,
+} from 'lucide-react';
+import { useAuth } from '../../hooks/useAuth';
+import { useLanguage } from '../../i18n';
+import styles from './Navbar.module.css';
+
+interface NavItem {
+  to: string;
+  icon: React.ReactNode;
+  labelKey: string;
+  badge?: number;
+  premium?: boolean;
+}
+
+interface NavbarProps {
+  unreadMessages?: number;
+  unreadNotifications?: number;
+}
+
+export default function Navbar({
+  unreadMessages = 0,
+  unreadNotifications = 0,
+}: NavbarProps) {
+  const { user } = useAuth();
+  const { t } = useLanguage();
+
+  const navItems: NavItem[] = [
+    { to: '/search', icon: <Search size={22} />, labelKey: 'navbar.search' },
+    { to: '/feed', icon: <Heart size={22} />, labelKey: 'navbar.feed' },
+    {
+      to: '/chat',
+      icon: <MessageCircle size={22} />,
+      labelKey: 'navbar.messages',
+      badge: unreadMessages,
+    },
+    {
+      to: '/notifications',
+      icon: <Bell size={22} />,
+      labelKey: 'navbar.notifications',
+      badge: unreadNotifications,
+    },
+    { to: '/premium', icon: <Crown size={22} />, labelKey: 'navbar.premium', premium: true },
+    { to: '/profile', icon: <User size={22} />, labelKey: 'navbar.profile' },
+    { to: '/settings', icon: <Settings size={22} />, labelKey: 'navbar.settings' },
+  ];
+
+  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ??
+    user?.email ??
+    'U';
+
+  return (
+    <nav className={styles.navbar} role="navigation" aria-label={t('navbar.ariaLabel')}>
+      {/* Логотип */}
+      <div className={styles.logo}>
+        <span className={styles.logoText}>L</span>
+      </div>
+
+      {/* Навигация */}
+      <ul className={styles.navList}>
+        {navItems.map((item) => {
+          const label = t(item.labelKey);
+          return (
+            <li key={item.to} className={styles.navItem}>
+              <NavLink
+                to={item.to}
+                className={({ isActive }) =>
+                  `${styles.navLink} ${isActive ? styles.active : ''} ${item.premium ? styles.premiumLink : ''}`
+                }
+                aria-label={
+                  item.badge && item.badge > 0
+                    ? `${label} (${item.badge > 99 ? '99+' : item.badge} ${t('navbar.unreadSuffix')})`
+                    : label
+                }
+              >
+                <span className={styles.iconWrap} aria-hidden="true">
+                  {item.icon}
+                  {item.badge !== undefined && item.badge > 0 && (
+                    <span className={styles.badge} aria-hidden="true">
+                      {item.badge > 99 ? '99+' : item.badge}
+                    </span>
+                  )}
+                </span>
+                <span className={styles.tooltip}>{label}</span>
+              </NavLink>
+            </li>
+          );
+        })}
+      </ul>
+
+      {/* Аватар пользователя */}
+      <div className={styles.userSection}>
+        <NavLink to="/profile" className={styles.avatarLink}>
+          {avatarUrl ? (
+            <img
+              src={avatarUrl}
+              alt={displayName}
+              className={styles.avatar}
+            />
+          ) : (
+            <div className={styles.avatarFallback}>
+              {displayName.charAt(0).toUpperCase()}
+            </div>
+          )}
+        </NavLink>
+      </div>
+    </nav>
+  );
+}

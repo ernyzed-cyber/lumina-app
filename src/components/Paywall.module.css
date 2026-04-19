@@ -1,0 +1,164 @@
+/* ─── Paywall Modal ─── */
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: var(--z-modal, 400);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+
+.modal {
+  max-width: 400px;
+  width: calc(100% - 32px);
+  background: var(--bg-card, #1E1A2E);
+  border: 1px solid var(--border-subtle, rgba(139, 92, 246, 0.08));
+  border-radius: var(--radius-xl, 24px);
+  padding: 32px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.modal::before {
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: 50%;
+  translate: -50% 0;
+  width: 300px;
+  height: 300px;
+  background: none;
+  pointer-events: none;
+  border-radius: 50%;
+}
+
+/* ─── Crown ─── */
+
+.crown {
+  font-size: 2.5rem;
+  line-height: 1;
+  position: relative;
+}
+
+/* ─── Title ─── */
+
+.title {
+  font-family: var(--font-display, sans-serif);
+  font-size: 1.5rem;
+  font-weight: 800;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  line-height: 1.25;
+  position: relative;
+}
+
+/* ─── Subtitle ─── */
+
+.subtitle {
+  color: var(--text-secondary, #B8B3CC);
+  font-family: var(--font-body, sans-serif);
+  font-size: var(--text-sm, 0.875rem);
+  line-height: 1.5;
+  position: relative;
+}
+
+/* ─── Feature list ─── */
+
+.featureList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+  position: relative;
+}
+
+.featureItem {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+  color: var(--text-primary, #F8F7FF);
+  font-family: var(--font-body, sans-serif);
+  font-size: var(--text-sm, 0.875rem);
+}
+
+.featureCheck {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  border-radius: var(--radius-full, 9999px);
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  color: #1E1A2E;
+  font-weight: 700;
+}
+
+/* ─── Buttons ─── */
+
+.upgradeBtn {
+  width: 100%;
+  padding: 14px 24px;
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%);
+  border: none;
+  border-radius: var(--radius-md, 12px);
+  color: #1E1A2E;
+  font-family: var(--font-display, sans-serif);
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+}
+
+.upgradeBtn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(255, 215, 0, 0.3);
+}
+
+.upgradeBtn:active {
+  transform: translateY(0);
+}
+
+.dismissBtn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted, #6B6580);
+  font-family: var(--font-body, sans-serif);
+  font-size: var(--text-sm, 0.875rem);
+  cursor: pointer;
+  padding: 8px;
+  transition: color 0.2s ease;
+}
+
+.dismissBtn:hover {
+  color: var(--text-secondary, #B8B3CC);
+}
+
+/* ─── Responsive ─── */
+
+@media (max-width: 480px) {
+  .modal {
+    width: calc(100% - 16px);
+    padding: 24px 20px;
+    gap: 16px;
+  }
+
+  .title {
+    font-size: 1.3rem;
+  }
+}
+

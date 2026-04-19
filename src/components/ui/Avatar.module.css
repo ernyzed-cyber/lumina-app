@@ -1,0 +1,57 @@
+.avatar {
+  position: relative;
+  border-radius: 50%;
+  flex-shrink: 0;
+  overflow: visible;
+}
+
+.clickable {
+  cursor: pointer;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+/* ── Sizes ── */
+.sm { width: 32px; height: 32px; }
+.md { width: 44px; height: 44px; }
+.lg { width: 56px; height: 56px; }
+.xl { width: 80px; height: 80px; }
+
+/* ── Gradient Ring ── */
+.ring {
+  padding: 2px;
+  background: var(--gradient-primary);
+}
+
+.ring .img {
+  border: 2px solid var(--bg-primary);
+}
+
+/* ── Online Status ── */
+.status {
+  position: absolute;
+  bottom: 1px;
+  right: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 2px solid var(--bg-primary);
+}
+
+.sm .status { width: 8px; height: 8px; }
+.lg .status { width: 12px; height: 12px; }
+.xl .status { width: 14px; height: 14px; }
+
+.online {
+  background: var(--online);
+  box-shadow: 0 0 6px rgba(52,211,153,0.5);
+}
+
+.offline {
+  background: var(--text-muted);
+}
