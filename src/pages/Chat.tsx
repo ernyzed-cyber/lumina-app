@@ -496,10 +496,12 @@ export default function Chat() {
         }
 
         const data = await res.json();
-        const reply = data?.reply
+        const rawReply = data?.reply
           ?? data?.choices?.[0]?.message?.content
           ?? data?.content
-          ?? t('chat.aiFallbackReply');
+          ?? '';
+        const reply = (typeof rawReply === 'string' ? rawReply.trim() : '')
+          || t('chat.aiFallbackReply');
 
         const aiMsg: Message = {
           id: genId(),

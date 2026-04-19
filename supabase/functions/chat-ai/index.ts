@@ -63,24 +63,21 @@ function json(status: number, data: unknown): Response {
   });
 }
 
-async function callLLM(
+async function callOpenRouter(
   apiKey: string,
+  model: string,
   messages: ChatMessage[],
-  opts: {
-    temperature?: number;
-    max_tokens?: number;
-    models?: string[];
-  } = {},
-): Promise<{ reply: string; model: string }> {
-  const models = opts.models ?? MODELS;
-  // OpenRouter auto-fallback: если передан `models` массив (max 3),
-  // провайдер пробует их по очереди при 429/5xx. Параметр `model` игнорируется.
-  const body = {
-    models,
+  opts: { temperature?: number; max_tokens?: number; fallbackModels?: string[] },
+): Promise<{ reply: string; model: string; raw: unknown }> {
+  const body: Record<string, unknown> = {
+    model,
     messages,
     temperature: opts.temperature ?? 0.85,
-    max_tokens: opts.max_tokens ?? 150,
+    max_tokens: opts.max_tokens ?? 250,
   };
+  if (opts.fallbackModels && opts.fallbackModels.length > 0) {
+    body.models = [model, ...opts.fallbackModels].slice(0, 3);
+  }
   const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
@@ -97,8 +94,44 @@ async function callLLM(
   }
   const data = await res.json();
   const reply = (data?.choices?.[0]?.message?.content ?? '').trim();
-  const usedModel = data?.model ?? models[0];
-  return { reply, model: usedModel };
+  const usedModel = data?.model ?? model;
+  return { reply, model: usedModel, raw: data };
+}
+
+async function callLLM(
+  apiKey: string,
+  messages: ChatMessage[],
+  opts: {
+    temperature?: number;
+    max_tokens?: number;
+    models?: string[];
+  } = {},
+): Promise<{ reply: string; model: string }> {
+  const models = opts.models ?? MODELS;
+  // Пробуем каждую модель отдельно. Если модель вернула пустой ответ
+  // или упала — идём к следующей. Это надёжнее чем передавать массив
+  // `models` в OpenRouter, так как там иногда пустой content приходит.
+  let lastErr: unknown = null;
+  for (const model of models) {
+    try {
+      const result = await callOpenRouter(apiKey, model, messages, {
+        temperature: opts.temperature,
+        max_tokens: opts.max_tokens,
+      });
+      if (result.reply && result.reply.length > 0) {
+        return { reply: result.reply, model: result.model };
+      }
+      console.warn(
+        `[chat-ai] empty reply from ${model}, raw:`,
+        JSON.stringify(result.raw).slice(0, 500),
+      );
+      lastErr = new Error(`Empty reply from ${model}`);
+    } catch (err) {
+      console.warn(`[chat-ai] ${model} failed:`, err);
+      lastErr = err;
+    }
+  }
+  throw lastErr ?? new Error('All models failed');
 }
 
 function buildUserContextBlock(profile: Record<string, unknown> | null): string {
@@ -263,8 +296,12 @@ Deno.serve(async (req: Request) => {
 
     const { reply, model: usedModel } = await callLLM(apiKey, finalMessages, {
       temperature: 0.9,
-      max_tokens: 150,
+      max_tokens: 300,
     });
+
+    if (!reply || reply.length === 0) {
+      return json(502, { error: 'Empty reply from all models' });
+    }
 
     if (girlId && userId) {
       const fullDialog: ChatMessage[] = [
