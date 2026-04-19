@@ -218,7 +218,7 @@ export default function Chat() {
   const [dialogs, setDialogs] = useState<DialogPreview[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
-  const [aiPersonality, setAiPersonality] = useState('romantic');
+
   const [msgLimits, setMsgLimits] = useState<MsgLimits>(loadMsgLimits);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -258,13 +258,7 @@ export default function Chat() {
     setCurrentGirl(girls[0]);
   }, [searchParams, lang, girls]);
 
-  /* ── Load AI personality from settings ── */
-  useEffect(() => {
-    const settings = storage.load<{ aiPersonality?: string }>('settings');
-    if (settings?.aiPersonality) {
-      setAiPersonality(settings.aiPersonality);
-    }
-  }, []);
+
 
   /* ── Load real dialog previews from Supabase ── */
   useEffect(() => {
