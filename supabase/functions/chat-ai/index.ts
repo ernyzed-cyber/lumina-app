@@ -1,11 +1,12 @@
-﻿// Supabase Edge Function: chat-ai
-// "Р–РёРІР°СЏ" РґРµРІСѓС€РєР°: Р·Р°РіСЂСѓР¶Р°РµС‚ РїРµСЂСЃРѕРЅР°Р¶Р° РёР· girl_personas, РїСЂРѕС„РёР»СЊ СЃРѕР±РµСЃРµРґРЅРёРєР°
-// РёР· profiles, РїРѕСЃР»РµРґРЅРёРµ РІРѕСЃРїРѕРјРёРЅР°РЅРёСЏ РёР· memories, СЃРѕР±РёСЂР°РµС‚ РјРµРіР°РїСЂРѕРјРїС‚,
-// РІС‹Р·С‹РІР°РµС‚ OpenRouter, РІРѕР·РІСЂР°С‰Р°РµС‚ РѕС‚РІРµС‚. РђСЃРёРЅС…СЂРѕРЅРЅРѕ СЃРѕС…СЂР°РЅСЏРµС‚ РЅРѕРІРѕРµ РІРѕСЃРїРѕРјРёРЅР°РЅРёРµ.
+// Supabase Edge Function: chat-ai
+// "Живая" девушка: грузит персонажа из girl_personas, профиль собеседника
+// из profiles, последние воспоминания из memories, собирает мегапромпт,
+// вызывает OpenRouter (с fallback-цепочкой моделей), возвращает ответ.
+// Асинхронно создаёт новое воспоминание каждые SUMMARY_TRIGGER сообщений.
 //
-// Secrets (РЅР°СЃС‚СЂР°РёРІР°СЋС‚СЃСЏ РІ Supabase Dashboard в†’ Edge Functions в†’ Secrets):
-//   OPENROUTER_API_KEY     вЂ” РєР»СЋС‡ OpenRouter (sk-or-...)
-// РђРІС‚РѕРјР°С‚РёС‡РµСЃРєРё РґРѕСЃС‚СѓРїРЅС‹:
+// Secrets (настраиваются в Supabase Dashboard -> Edge Functions -> Secrets):
+//   OPENROUTER_API_KEY  -- ключ OpenRouter (sk-or-...)
+// Автоматически доступны:
 //   SUPABASE_URL
 //   SUPABASE_SERVICE_ROLE_KEY
 
@@ -31,8 +32,24 @@ const CORS_HEADERS: Record<string, string> = {
 };
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
-// Р‘РµСЃРїР»Р°С‚РЅР°СЏ РјРѕС‰РЅР°СЏ РјРѕРґРµР»СЊ РЅР° OpenRouter Р±РµР· TPM Р»РёРјРёС‚РѕРІ
-const MODEL = 'google/gemma-4-31b-it:free';
+
+// Fallback-цепочка: OpenRouter попробует каждую модель по очереди при 429/5xx.
+// Если первая рейтлимитит — автоматически переключается на следующую.
+// Порядок: от лучшего качества к запасным.
+const MODELS = [
+  'meta-llama/llama-3.3-70b-instruct:free',
+  'qwen/qwen3-next-80b-a3b-instruct:free',
+  'z-ai/glm-4.5-air:free',
+  'google/gemma-3-27b-it:free',
+  'nousresearch/hermes-3-llama-3.1-405b:free',
+];
+// Модель-репортер для саммари (короткие тексты, подойдёт любая быстрая).
+const SUMMARY_MODELS = [
+  'google/gemma-3-12b-it:free',
+  'meta-llama/llama-3.2-3b-instruct:free',
+  'google/gemma-3-4b-it:free',
+];
+
 const MEMORY_LIMIT = 3;
 const SUMMARY_TRIGGER = 6;
 
@@ -50,8 +67,21 @@ function json(status: number, data: unknown): Response {
 async function callLLM(
   apiKey: string,
   messages: ChatMessage[],
-  opts: { temperature?: number; max_tokens?: number } = {},
-): Promise<string> {
+  opts: {
+    temperature?: number;
+    max_tokens?: number;
+    models?: string[];
+  } = {},
+): Promise<{ reply: string; model: string }> {
+  const models = opts.models ?? MODELS;
+  const body = {
+    model: models[0],
+    models, // OpenRouter auto-fallback при 429/5xx
+    route: 'fallback',
+    messages,
+    temperature: opts.temperature ?? 0.85,
+    max_tokens: opts.max_tokens ?? 150,
+  };
   const res = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {
@@ -60,23 +90,22 @@ async function callLLM(
       'HTTP-Referer': 'https://lumina-app-eight-sable.vercel.app',
       'X-Title': 'Lumina',
     },
-    body: JSON.stringify({
-      model: MODEL,
-      messages,
-      temperature: opts.temperature ?? 0.85,
-      max_tokens: opts.max_tokens ?? 150,
-    }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) {
     const text = await res.text().catch(() => '');
     throw new Error(`OpenRouter ${res.status}: ${text}`);
   }
   const data = await res.json();
-  return (data?.choices?.[0]?.message?.content ?? '').trim();
+  const reply = (data?.choices?.[0]?.message?.content ?? '').trim();
+  const usedModel = data?.model ?? models[0];
+  return { reply, model: usedModel };
 }
 
 function buildUserContextBlock(profile: Record<string, unknown> | null): string {
-  if (!profile) return 'You are talking to a new person, you know nothing about him yet. Get to know him naturally.';
+  if (!profile) {
+    return 'You are talking to a new person, you know nothing about him yet. Get to know him naturally.';
+  }
   const parts: string[] = [];
   const name = (profile.name as string) || (profile.full_name as string) || null;
   const age = profile.age as number | null;
@@ -91,12 +120,13 @@ function buildUserContextBlock(profile: Record<string, unknown> | null): string 
   if (Array.isArray(interests) && interests.length > 0) {
     parts.push(`Interests: ${interests.join(', ')}.`);
   }
-
   if (parts.length === 0) return 'The interlocutor has no profile info yet.';
   return 'WHAT YOU KNOW ABOUT HIM:\n' + parts.join(' ');
 }
 
-function buildMemoryBlock(memories: Array<{ summary: string; created_at: string }>): string {
+function buildMemoryBlock(
+  memories: Array<{ summary: string; created_at: string }>,
+): string {
   if (!memories || memories.length === 0) {
     return 'YOUR PAST CONVERSATIONS: this is your first conversation.';
   }
@@ -107,7 +137,10 @@ function buildMemoryBlock(memories: Array<{ summary: string; created_at: string 
       const date = new Date(m.created_at).toLocaleDateString('ru-RU');
       return `[${date}] ${m.summary}`;
     });
-  return 'YOUR PAST CONVERSATIONS (oldest to newest, use naturally):\n' + lines.join('\n');
+  return (
+    'YOUR PAST CONVERSATIONS (oldest to newest, use naturally):\n' +
+    lines.join('\n')
+  );
 }
 
 async function saveMemoryAsync(
@@ -120,19 +153,23 @@ async function saveMemoryAsync(
   try {
     if (dialog.length < SUMMARY_TRIGGER) return;
     const transcript = dialog
-      .map((m) => `${m.role === 'user' ? 'РћРќ' : 'РЇ'}: ${m.content}`)
+      .map((m) => `${m.role === 'user' ? 'HE' : 'I'}: ${m.content}`)
       .join('\n');
     const summaryPrompt: ChatMessage[] = [
       {
         role: 'system',
         content:
-          'You read a chat transcript and write a brief diary entry summary in Russian (2-3 sentences, first person "РјС‹ РіРѕРІРѕСЂРёР»Рё Рѕ..."). Only capture important facts about the interlocutor and emotional tone. No fluff. No emoji.',
+          'You read a chat transcript and write a brief diary entry in Russian (2-3 sentences, first person, like "говорили о..."). Capture only important facts about the interlocutor and emotional tone. No fluff. No emoji.',
       },
-      { role: 'user', content: `Transcript:\n${transcript}\n\nWrite a 2-3 sentence summary in Russian.` },
+      {
+        role: 'user',
+        content: `Transcript:\n${transcript}\n\nWrite a 2-3 sentence diary entry in Russian.`,
+      },
     ];
-    const summary = await callLLM(apiKey, summaryPrompt, {
+    const { reply: summary } = await callLLM(apiKey, summaryPrompt, {
       temperature: 0.4,
       max_tokens: 120,
+      models: SUMMARY_MODELS,
     });
     if (!summary) return;
     await supabase.from('memories').insert({
@@ -160,7 +197,9 @@ Deno.serve(async (req: Request) => {
 
   try {
     const apiKey = Deno.env.get('OPENROUTER_API_KEY');
-    if (!apiKey) return json(500, { error: 'OPENROUTER_API_KEY is not configured' });
+    if (!apiKey) {
+      return json(500, { error: 'OPENROUTER_API_KEY is not configured' });
+    }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
@@ -202,10 +241,10 @@ Deno.serve(async (req: Request) => {
         systemPrompt = [
           personaPrompt,
           '',
-          'в”Ѓв”Ѓв”Ѓ CONTEXT ABOUT INTERLOCUTOR в”Ѓв”Ѓв”Ѓ',
+          '=== CONTEXT ABOUT INTERLOCUTOR ===',
           buildUserContextBlock(profile),
           '',
-          'в”Ѓв”Ѓв”Ѓ MEMORY в”Ѓв”Ѓв”Ѓ',
+          '=== MEMORY ===',
           buildMemoryBlock(memories),
         ].join('\n');
       } else if (legacyPrompt) {
@@ -218,10 +257,12 @@ Deno.serve(async (req: Request) => {
     }
 
     const finalMessages: ChatMessage[] = [];
-    if (systemPrompt) finalMessages.push({ role: 'system', content: systemPrompt });
+    if (systemPrompt) {
+      finalMessages.push({ role: 'system', content: systemPrompt });
+    }
     finalMessages.push(...messages);
 
-    const reply = await callLLM(apiKey, finalMessages, {
+    const { reply, model: usedModel } = await callLLM(apiKey, finalMessages, {
       temperature: 0.9,
       max_tokens: 150,
     });
@@ -244,7 +285,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return json(200, { reply, model: MODEL });
+    return json(200, { reply, model: usedModel });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[chat-ai] fatal:', message);
