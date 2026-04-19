@@ -36,12 +36,11 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 // Fallback-цепочка: OpenRouter попробует каждую модель по очереди при 429/5xx.
 // Если первая рейтлимитит — автоматически переключается на следующую.
 // Порядок: от лучшего качества к запасным.
+// OpenRouter разрешает максимум 3 модели в fallback-массиве.
 const MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
   'qwen/qwen3-next-80b-a3b-instruct:free',
   'z-ai/glm-4.5-air:free',
-  'google/gemma-3-27b-it:free',
-  'nousresearch/hermes-3-llama-3.1-405b:free',
 ];
 // Модель-репортер для саммари (короткие тексты, подойдёт любая быстрая).
 const SUMMARY_MODELS = [
@@ -74,10 +73,10 @@ async function callLLM(
   } = {},
 ): Promise<{ reply: string; model: string }> {
   const models = opts.models ?? MODELS;
+  // OpenRouter auto-fallback: если передан `models` массив (max 3),
+  // провайдер пробует их по очереди при 429/5xx. Параметр `model` игнорируется.
   const body = {
-    model: models[0],
-    models, // OpenRouter auto-fallback при 429/5xx
-    route: 'fallback',
+    models,
     messages,
     temperature: opts.temperature ?? 0.85,
     max_tokens: opts.max_tokens ?? 150,
