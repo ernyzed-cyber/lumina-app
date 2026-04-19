@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
+import NotificationBanner from './components/NotificationBanner';
 import { useLanguage } from './i18n';
 
 /* ── Lazy-loaded pages (code splitting) ── */
@@ -51,6 +52,7 @@ function App() {
       <a href="#main-content" className="skip-to-content">
         {t('app.skipToContent')}
       </a>
+      <NotificationBanner />
       <Routes>
         {/* Публичные маршруты */}
         <Route path="/" element={<Landing />} />

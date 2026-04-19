@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { getLocalizedGirls, getLocalizedGirlById, type Girl } from '../data/girls';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../hooks/useNotifications';
 import { supabase } from '../lib/supabase';
 import { storage } from '../utils/helpers';
 import { Avatar } from '../components/ui/Avatar';
@@ -126,6 +127,7 @@ export default function Chat() {
   const { t, tr, lang } = useLanguage();
   const { user, session, loading: authLoading } = useAuth();
   const { isVerified: telegramVerified } = useTelegramVerified();
+  const { resetMessages } = useNotifications();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -245,6 +247,11 @@ export default function Chat() {
       navigate('/auth', { replace: true });
     }
   }, [user, authLoading, navigate]);
+
+  /* ── Reset unread messages counter on chat open ── */
+  useEffect(() => {
+    resetMessages();
+  }, [resetMessages]);
 
   /* ── Select girl from URL ── */
   useEffect(() => {

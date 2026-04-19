@@ -13,6 +13,7 @@ import {
 import Navbar from '../components/layout/Navbar';
 import PageTransition from '../components/layout/PageTransition';
 import { useAuth } from '../hooks/useAuth';
+import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../hooks/useToast';
 import { useLanguage } from '../i18n';
 import { supabase } from '../lib/supabase';
@@ -154,6 +155,7 @@ export default function Notifications() {
   const { user, loading: authLoading } = useAuth();
   const { showToast, ToastContainer } = useToast();
   const { t } = useLanguage();
+  const { markLocalRead, markAllLocalRead, refresh } = useNotifications();
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -240,6 +242,7 @@ export default function Notifications() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
       );
+      markLocalRead(id);
 
       if (user) {
         try {
@@ -248,17 +251,19 @@ export default function Notifications() {
             .update({ read: true })
             .eq('id', id)
             .eq('user_id', user.id);
+          refresh();
         } catch {
           // Тихий fallback
         }
       }
     },
-    [user],
+    [user, markLocalRead, refresh],
   );
 
   /* ── Пометить все как прочитанные ── */
   const markAllRead = useCallback(async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    markAllLocalRead();
     showToast(t('notifications.toast.allRead'), 'success');
 
     if (user) {
@@ -267,15 +272,17 @@ export default function Notifications() {
           .from('notifications')
           .update({ read: true })
           .eq('user_id', user.id);
+        refresh();
       } catch {
         // Тихий fallback
       }
     }
-  }, [user, showToast, t]);
+  }, [user, showToast, t, markAllLocalRead, refresh]);
 
   /* ── Очистить все ── */
   const clearAll = useCallback(async () => {
     setNotifications([]);
+    markAllLocalRead();
     showToast(t('notifications.toast.cleared'), 'success');
 
     if (user) {
@@ -284,11 +291,12 @@ export default function Notifications() {
           .from('notifications')
           .delete()
           .eq('user_id', user.id);
+        refresh();
       } catch {
         // Тихий fallback
       }
     }
-  }, [user, showToast, t]);
+  }, [user, showToast, t, markAllLocalRead, refresh]);
 
   /* ── Клик по уведомлению ── */
   const handleItemClick = useCallback(

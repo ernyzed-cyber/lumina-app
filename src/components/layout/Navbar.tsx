@@ -9,6 +9,7 @@ import {
   Crown,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
+import { useNotifications } from '../../hooks/useNotifications';
 import { useLanguage } from '../../i18n';
 import styles from './Navbar.module.css';
 
@@ -26,11 +27,18 @@ interface NavbarProps {
 }
 
 export default function Navbar({
-  unreadMessages = 0,
-  unreadNotifications = 0,
+  unreadMessages,
+  unreadNotifications,
 }: NavbarProps) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const {
+    unreadMessages: ctxMessages,
+    unreadNotifications: ctxNotifications,
+  } = useNotifications();
+
+  const messagesBadge = unreadMessages ?? ctxMessages;
+  const notificationsBadge = unreadNotifications ?? ctxNotifications;
 
   const navItems: NavItem[] = [
     { to: '/search', icon: <Search size={22} />, labelKey: 'navbar.search' },
@@ -39,13 +47,13 @@ export default function Navbar({
       to: '/chat',
       icon: <MessageCircle size={22} />,
       labelKey: 'navbar.messages',
-      badge: unreadMessages,
+      badge: messagesBadge,
     },
     {
       to: '/notifications',
       icon: <Bell size={22} />,
       labelKey: 'navbar.notifications',
-      badge: unreadNotifications,
+      badge: notificationsBadge,
     },
     { to: '/premium', icon: <Crown size={22} />, labelKey: 'navbar.premium', premium: true },
     { to: '/profile', icon: <User size={22} />, labelKey: 'navbar.profile' },
