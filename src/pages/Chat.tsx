@@ -498,11 +498,8 @@ export default function Chat() {
           },
           body: JSON.stringify({
             messages: recent,
-            system_prompt: [
-              currentGirl.character,
-              PERSONALITY_PROMPTS[aiPersonality] ?? '',
-              'Reply briefly (1-3 sentences), naturally, in the same language the user writes. Never mention you are AI or a bot.',
-            ].filter(Boolean).join(' '),
+            girlId: currentGirl.id,
+            userId: user?.id,
           }),
         });
 
