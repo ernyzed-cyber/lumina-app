@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
@@ -67,6 +67,7 @@ interface ProfileData {
   bodyType: string;
   height: string;
   weight: string;
+  photos: string[];
 }
 
 const DEFAULT_PROFILE: ProfileData = {
@@ -91,7 +92,12 @@ const DEFAULT_PROFILE: ProfileData = {
   bodyType: '',
   height: '',
   weight: '',
+  photos: [],
 };
+
+const MAX_PHOTOS = 6;
+const MAX_PHOTO_SIZE_MB = 5;
+const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 const PROGRESS_FIELDS: (keyof ProfileData)[] = [
   'name', 'age', 'city', 'about', 'lookingFor', 'datingGoal',
@@ -273,6 +279,10 @@ export default function Profile() {
   // Delete
   const [deleting, setDeleting] = useState(false);
 
+  // Photos
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   /* ── Auth guard ── */
   useEffect(() => {
     if (!authLoading && !user) {
@@ -295,10 +305,16 @@ export default function Profile() {
       try {
         const { data } = await supabase
           .from('profiles')
-          .select('bio')
+          .select('bio, avatar_url, photos')
           .eq('id', user.id)
           .single();
-        if (data?.bio) setProfileData((prev) => ({ ...prev, about: data.bio }));
+        if (data) {
+          setProfileData((prev) => ({
+            ...prev,
+            about: data.bio ?? prev.about,
+            photos: Array.isArray(data.photos) ? data.photos : prev.photos,
+          }));
+        }
       } catch {
         // Table not created yet
       }
@@ -308,7 +324,7 @@ export default function Profile() {
   /* ── Progress ── */
   const progress = useMemo(() => {
     const filled = PROGRESS_FIELDS.filter(
-      (k) => profileData[k].trim() !== '',
+      (k) => (profileData[k] as string).trim() !== '',
     ).length;
     return Math.round((filled / PROGRESS_FIELDS.length) * 100);
   }, [profileData]);
@@ -442,7 +458,7 @@ export default function Profile() {
   const openEditor = useCallback(
     (field: EditField) => {
       setEditingField(field);
-      setEditValue(profileData[field.key]);
+      setEditValue(profileData[field.key] as string);
     },
     [profileData],
   );
@@ -516,6 +532,114 @@ export default function Profile() {
     setEditingField(null);
     setEditValue('');
   }, []);
+
+  /* ── Upload photo ── */
+  const handleUploadPhoto = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      // reset input so same file can be re-selected
+      if (e.target) e.target.value = '';
+      if (!file || !user) return;
+
+      if (profileData.photos.length >= MAX_PHOTOS) {
+        showToast(t('profile.photoLimit', { max: MAX_PHOTOS }), 'warning');
+        return;
+      }
+
+      if (!ALLOWED_PHOTO_TYPES.includes(file.type)) {
+        showToast(t('profile.photoInvalidType'), 'error');
+        return;
+      }
+
+      if (file.size > MAX_PHOTO_SIZE_MB * 1024 * 1024) {
+        showToast(
+          t('profile.photoTooLarge', { max: MAX_PHOTO_SIZE_MB }),
+          'error',
+        );
+        return;
+      }
+
+      setUploadingPhoto(true);
+      try {
+        const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+        const fileName = `${crypto.randomUUID()}.${ext}`;
+        const filePath = `${user.id}/${fileName}`;
+
+        const { error: uploadError } = await supabase.storage
+          .from('avatars')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: false,
+            contentType: file.type,
+          });
+
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage
+          .from('avatars')
+          .getPublicUrl(filePath);
+
+        const publicUrl = urlData.publicUrl;
+        const newPhotos = [...profileData.photos, publicUrl];
+
+        // If first photo → also set as avatar_url
+        const isFirst = profileData.photos.length === 0;
+
+        const { error: upsertError } = await supabase.from('profiles').upsert({
+          id: user.id,
+          photos: newPhotos,
+          ...(isFirst ? { avatar_url: publicUrl } : {}),
+          updated_at: new Date().toISOString(),
+        });
+
+        if (upsertError) throw upsertError;
+
+        setProfileData((prev) => ({ ...prev, photos: newPhotos }));
+        showToast(t('profile.photoUploaded'), 'success');
+      } catch (err) {
+        console.error('[Profile] photo upload error:', err);
+        showToast(t('profile.photoUploadError'), 'error');
+      } finally {
+        setUploadingPhoto(false);
+      }
+    },
+    [user, profileData.photos, showToast, t],
+  );
+
+  /* ── Delete photo ── */
+  const handleDeletePhoto = useCallback(
+    async (photoUrl: string) => {
+      if (!user) return;
+      if (!window.confirm(t('profile.deletePhoto') + '?')) return;
+
+      try {
+        // Extract storage path after "/avatars/"
+        const marker = '/avatars/';
+        const idx = photoUrl.indexOf(marker);
+        if (idx !== -1) {
+          const path = photoUrl.slice(idx + marker.length);
+          await supabase.storage.from('avatars').remove([path]);
+        }
+
+        const newPhotos = profileData.photos.filter((p) => p !== photoUrl);
+        const newAvatar = newPhotos[0] ?? null;
+
+        await supabase.from('profiles').upsert({
+          id: user.id,
+          photos: newPhotos,
+          avatar_url: newAvatar,
+          updated_at: new Date().toISOString(),
+        });
+
+        setProfileData((prev) => ({ ...prev, photos: newPhotos }));
+        showToast(t('profile.photoDeleted'), 'info');
+      } catch (err) {
+        console.error('[Profile] photo delete error:', err);
+        showToast(t('profile.photoDeleteError'), 'error');
+      }
+    },
+    [user, profileData.photos, showToast, t],
+  );
 
   /* ── Change password ── */
   const handleChangePassword = useCallback(async () => {
@@ -639,25 +763,130 @@ export default function Profile() {
           )}
 
           {/* ════════ Photo Grid ════════ */}
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/jpeg,image/png,image/webp"
+            hidden
+            onChange={handleUploadPhoto}
+          />
           <div className={s.photoGrid}>
-            <div className={s.photoMain}>
-              <Plus size={32} className={s.photoPlaceholderIcon} />
-            </div>
-            <div className={s.photoSmall}>
-              <Plus size={24} className={s.photoPlaceholderIcon} />
-            </div>
-            <div className={s.photoSmall}>
-              <Plus size={24} className={s.photoPlaceholderIcon} />
-            </div>
+            {/* Main photo slot */}
+            {profileData.photos[0] ? (
+              <div className={s.photoMain}>
+                <img
+                  src={profileData.photos[0]}
+                  alt=""
+                  className={s.photoImg}
+                />
+                <button
+                  type="button"
+                  className={s.photoDeleteBtn}
+                  onClick={() => handleDeletePhoto(profileData.photos[0])}
+                  aria-label={t('profile.deletePhoto') as string}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={s.photoMain}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+              >
+                <Plus size={32} className={s.photoPlaceholderIcon} />
+              </button>
+            )}
+
+            {/* Small photo slot 1 */}
+            {profileData.photos[1] ? (
+              <div className={s.photoSmall}>
+                <img
+                  src={profileData.photos[1]}
+                  alt=""
+                  className={s.photoImg}
+                />
+                <button
+                  type="button"
+                  className={s.photoDeleteBtn}
+                  onClick={() => handleDeletePhoto(profileData.photos[1])}
+                  aria-label={t('profile.deletePhoto') as string}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={s.photoSmall}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+              >
+                <Plus size={24} className={s.photoPlaceholderIcon} />
+              </button>
+            )}
+
+            {/* Small photo slot 2 */}
+            {profileData.photos[2] ? (
+              <div className={s.photoSmall}>
+                <img
+                  src={profileData.photos[2]}
+                  alt=""
+                  className={s.photoImg}
+                />
+                <button
+                  type="button"
+                  className={s.photoDeleteBtn}
+                  onClick={() => handleDeletePhoto(profileData.photos[2])}
+                  aria-label={t('profile.deletePhoto') as string}
+                >
+                  <X size={14} />
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                className={s.photoSmall}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={uploadingPhoto}
+              >
+                <Plus size={24} className={s.photoPlaceholderIcon} />
+              </button>
+            )}
           </div>
+
+          {/* Extra photos (slots 4-6) as a row below the grid */}
+          {profileData.photos.length > 3 && (
+            <div className={s.extraPhotosRow}>
+              {profileData.photos.slice(3).map((url) => (
+                <div key={url} className={s.extraPhoto}>
+                  <img src={url} alt="" className={s.photoImg} />
+                  <button
+                    type="button"
+                    className={s.photoDeleteBtn}
+                    onClick={() => handleDeletePhoto(url)}
+                    aria-label={t('profile.deletePhoto') as string}
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* ════════ Add Photo Button ════════ */}
           <button
             className={s.addPhotoBtn}
-            onClick={() => showToast(t('profile.photoComingSoon'), 'info')}
+            onClick={() => fileInputRef.current?.click()}
+            disabled={uploadingPhoto || profileData.photos.length >= MAX_PHOTOS}
           >
             <Camera size={18} />
-            {t('profile.addPhoto')}
+            {uploadingPhoto
+              ? t('profile.photoUploading')
+              : profileData.photos.length >= MAX_PHOTOS
+                ? t('profile.photoLimit', { max: MAX_PHOTOS })
+                : t('profile.addPhoto')}
           </button>
 
           {/* ════════ Profile Fields ════════ */}
