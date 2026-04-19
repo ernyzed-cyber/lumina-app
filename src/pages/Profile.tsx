@@ -38,6 +38,7 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useLanguage } from '../i18n';
 import { usePremium } from '../hooks/usePremium';
+import { useMyProfile } from '../hooks/useMyProfile';
 import { storage } from '../utils/helpers';
 import s from './Profile.module.css';
 
@@ -262,6 +263,7 @@ export default function Profile() {
   const navigate = useNavigate();
   const { t } = useLanguage();
   const { isPremium } = usePremium();
+  const { avatarUrl: myAvatar, setAvatarUrl: setMyAvatar, setPhotos: setMyPhotos } = useMyProfile();
 
   /* ── State ── */
   const [profileData, setProfileData] = useState<ProfileData>(() => {
@@ -595,6 +597,8 @@ export default function Profile() {
         if (upsertError) throw upsertError;
 
         setProfileData((prev) => ({ ...prev, photos: newPhotos }));
+        setMyPhotos(newPhotos);
+        if (isFirst) setMyAvatar(publicUrl);
         showToast(t('profile.photoUploaded'), 'success');
       } catch (err) {
         console.error('[Profile] photo upload error:', err);
@@ -603,7 +607,7 @@ export default function Profile() {
         setUploadingPhoto(false);
       }
     },
-    [user, profileData.photos, showToast, t],
+    [user, profileData.photos, showToast, t, setMyAvatar, setMyPhotos],
   );
 
   /* ── Delete photo ── */
@@ -632,13 +636,15 @@ export default function Profile() {
         });
 
         setProfileData((prev) => ({ ...prev, photos: newPhotos }));
+        setMyPhotos(newPhotos);
+        setMyAvatar(newAvatar);
         showToast(t('profile.photoDeleted'), 'info');
       } catch (err) {
         console.error('[Profile] photo delete error:', err);
         showToast(t('profile.photoDeleteError'), 'error');
       }
     },
-    [user, profileData.photos, showToast, t],
+    [user, profileData.photos, showToast, t, setMyAvatar, setMyPhotos],
   );
 
   /* ── Change password ── */
@@ -723,6 +729,21 @@ export default function Profile() {
           {/* ════════ Header ════════ */}
           <div className={s.header}>
             <div className={s.headerCenter}>
+              <div className={s.headerAvatarWrap}>
+                {myAvatar ? (
+                  <img
+                    src={myAvatar}
+                    alt=""
+                    className={s.headerAvatar}
+                  />
+                ) : (
+                  <div className={s.headerAvatarFallback}>
+                    {(profileData.name || user.email || 'U')
+                      .charAt(0)
+                      .toUpperCase()}
+                  </div>
+                )}
+              </div>
               <h1 className={s.headerTitle}>{t('profile.pageTitle')}</h1>
               <p className={s.headerSubtitle}>
                 {t('profile.progress', { percent: String(progress) })}

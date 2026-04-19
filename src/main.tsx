@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ThemeProvider } from './hooks/useTheme';
 import { NotificationsProvider } from './hooks/useNotifications';
+import { MyProfileProvider } from './hooks/useMyProfile';
 import { LanguageProvider } from './i18n';
 import App from './App';
 import './styles/global.css';
@@ -14,9 +15,11 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <LanguageProvider>
           <AuthProvider>
-            <NotificationsProvider>
-              <App />
-            </NotificationsProvider>
+            <MyProfileProvider>
+              <NotificationsProvider>
+                <App />
+              </NotificationsProvider>
+            </MyProfileProvider>
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>

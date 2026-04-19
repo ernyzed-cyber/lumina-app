@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
+import { useMyProfile } from '../../hooks/useMyProfile';
 import { useLanguage } from '../../i18n';
 import styles from './Navbar.module.css';
 
@@ -32,6 +33,7 @@ export default function Navbar({
 }: NavbarProps) {
   const { user } = useAuth();
   const { t } = useLanguage();
+  const { avatarUrl: profileAvatar, displayName: profileName } = useMyProfile();
   const {
     unreadMessages: ctxMessages,
     unreadNotifications: ctxNotifications,
@@ -60,8 +62,10 @@ export default function Navbar({
     { to: '/settings', icon: <Settings size={22} />, labelKey: 'navbar.settings' },
   ];
 
-  const avatarUrl = user?.user_metadata?.avatar_url as string | undefined;
+  const avatarUrl =
+    profileAvatar ?? (user?.user_metadata?.avatar_url as string | undefined);
   const displayName =
+    profileName ??
     (user?.user_metadata?.full_name as string | undefined) ??
     user?.email ??
     'U';
