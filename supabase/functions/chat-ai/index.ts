@@ -40,7 +40,8 @@ const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const MODELS = [
   'meta-llama/llama-3.3-70b-instruct:free',
   'qwen/qwen3-next-80b-a3b-instruct:free',
-  'z-ai/glm-4.5-air:free',
+  'google/gemma-3-27b-it:free',
+  'google/gemma-3-12b-it:free',
 ];
 // Модель-репортер для саммари (короткие тексты, подойдёт любая быстрая).
 const SUMMARY_MODELS = [
