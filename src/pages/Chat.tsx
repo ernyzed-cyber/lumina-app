@@ -492,7 +492,7 @@ export default function Chat() {
         if (!res.ok) {
           const errText = await res.text().catch(() => '');
           console.error('[chat-ai] API error', res.status, errText);
-          throw new Error('API error');
+          throw new Error(`API error ${res.status}: ${errText}`);
         }
 
         const data = await res.json();
