@@ -365,16 +365,23 @@ export default function Chat() {
     return () => { cancelled = true; };
   }, [user, currentGirl]);
 
-  /* ── Auto-scroll to bottom: instant on chat switch, smooth on new messages ── */
-  const prevGirlIdRef = useRef<string | null>(null);
+  /* ── Auto-scroll to bottom: instant после загрузки чата, smooth при новых сообщениях ── */
+  const justLoadedRef = useRef(false);
   useEffect(() => {
-    const switched = prevGirlIdRef.current !== (currentGirl?.id ?? null);
-    prevGirlIdRef.current = currentGirl?.id ?? null;
+    // Как только начинается загрузка нового чата — взвести флаг "следующий скролл мгновенный"
+    if (loadingMessages) {
+      justLoadedRef.current = true;
+    }
+  }, [loadingMessages, currentGirl?.id]);
+
+  useEffect(() => {
+    const instant = justLoadedRef.current;
+    justLoadedRef.current = false;
     messagesEndRef.current?.scrollIntoView({
-      behavior: switched ? 'auto' : 'smooth',
+      behavior: instant ? 'auto' : 'smooth',
       block: 'end',
     });
-  }, [messages, isTyping, currentGirl]);
+  }, [messages, isTyping]);
 
   /* ── Close emoji picker on click outside ── */
   useEffect(() => {
@@ -738,22 +745,28 @@ export default function Chat() {
           </div>
 
           {/* ── Обычные диалоги ── */}
-          {filteredDialogs.map((d) => (
+          {filteredDialogs.map((d) => {
+            // Онлайн-статус: только Алина имеет реальную persona в БД и динамический liveOnline.
+            // Остальные девушки пока офлайн до появления их personas.
+            const isActive = currentGirl?.id === d.girl.id;
+            const hasPersona = d.girl.id === 'alina';
+            const isOnline = hasPersona ? (isActive ? liveOnline : false) : false;
+            return (
             <div
               key={d.girl.id}
-              className={`${s.dialogRow} ${currentGirl?.id === d.girl.id ? s.dialogRowActive : ''}`}
+              className={`${s.dialogRow} ${isActive ? s.dialogRowActive : ''}`}
               onClick={() => switchGirl(d.girl)}
               role="option"
-              aria-selected={currentGirl?.id === d.girl.id}
+              aria-selected={isActive}
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchGirl(d.girl); } }}
             >
-              <Avatar src={d.girl.photo} alt={d.girl.name} size="sm" online={currentGirl?.id === d.girl.id ? liveOnline : d.girl.online} />
+              <Avatar src={d.girl.photo} alt={d.girl.name} size="sm" online={isOnline} />
               <div className={s.dialogInfo}>
                 <div className={s.dialogTop}>
                   <span className={s.dialogName}>
                     {d.girl.name}
-                    {(currentGirl?.id === d.girl.id ? liveOnline : d.girl.online) && <span className={s.nameOnlineDot} />}
+                    {isOnline && <span className={s.nameOnlineDot} />}
                   </span>
                   {d.time && <span className={s.dialogTime}>{d.time}</span>}
                 </div>
@@ -767,7 +780,8 @@ export default function Chat() {
                 </div>
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </aside>
 
