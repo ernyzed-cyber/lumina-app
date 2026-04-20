@@ -1,10 +1,10 @@
 // Supabase Edge Function: chat-ai
-// Gemini 2.0 Flash (Google AI Studio) — бесплатно, 15 RPM, 1M токенов/день.
+// Grok API (xAI) — OpenAI-compatible format.
 // Грузит персонажа из girl_personas, профиль из profiles, воспоминания из memories.
 // Асинхронно сохраняет резюме диалога в memories каждые SUMMARY_TRIGGER сообщений.
 //
 // Secrets:
-//   GOOGLE_AI_KEY          -- ключ Google AI Studio (AIza...)
+//   GROK_API_KEY           -- ключ xAI (xai-...)
 //   SUPABASE_URL           -- автоматически
 //   SUPABASE_SERVICE_ROLE_KEY -- автоматически
 
@@ -29,10 +29,8 @@ const CORS_HEADERS: Record<string, string> = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
-// Gemini 2.0 Flash — бесплатно, быстро, отлично понимает русский
-const GEMINI_MODEL = 'gemini-2.0-flash';
-const GEMINI_URL = (model: string, key: string) =>
-  `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+const GROK_URL = 'https://api.x.ai/v1/chat/completions';
+const GROK_MODEL = 'grok-4-1-fast-reasoning';
 
 const MEMORY_LIMIT = 3;
 const SUMMARY_TRIGGER = 6;
@@ -48,56 +46,36 @@ function json(status: number, data: unknown): Response {
   });
 }
 
-// Gemini использует другой формат: system отдельно, history как contents[]
-// role: 'model' вместо 'assistant'
-async function callGemini(
+async function callGrok(
   apiKey: string,
   messages: ChatMessage[],
-  opts: { temperature?: number; maxOutputTokens?: number } = {},
+  opts: { temperature?: number; max_tokens?: number } = {},
 ): Promise<string> {
-  // Вытащим system prompt если есть
-  const systemMsg = messages.find((m) => m.role === 'system');
-  const chatMessages = messages.filter((m) => m.role !== 'system');
-
-  // Конвертируем в формат Gemini
-  const contents = chatMessages.map((m) => ({
-    role: m.role === 'assistant' ? 'model' : 'user',
-    parts: [{ text: m.content }],
-  }));
-
-  const body: Record<string, unknown> = {
-    contents,
-    generationConfig: {
-      temperature: opts.temperature ?? 0.9,
-      maxOutputTokens: opts.maxOutputTokens ?? 300,
-    },
-  };
-
-  if (systemMsg) {
-    body.systemInstruction = {
-      parts: [{ text: systemMsg.content }],
-    };
-  }
-
-  const res = await fetch(GEMINI_URL(GEMINI_MODEL, apiKey), {
+  const res = await fetch(GROK_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: GROK_MODEL,
+      messages,
+      temperature: opts.temperature ?? 0.9,
+      max_tokens: opts.max_tokens ?? 300,
+    }),
   });
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    throw new Error(`Gemini ${res.status}: ${text}`);
+    throw new Error(`Grok ${res.status}: ${text}`);
   }
 
   const data = await res.json();
-  const reply = (
-    data?.candidates?.[0]?.content?.parts?.[0]?.text ?? ''
-  ).trim();
+  const reply = (data?.choices?.[0]?.message?.content ?? '').trim();
 
   if (!reply) {
-    const reason = data?.candidates?.[0]?.finishReason ?? 'unknown';
-    throw new Error(`Gemini empty reply, finishReason: ${reason}`);
+    const reason = data?.choices?.[0]?.finish_reason ?? 'unknown';
+    throw new Error(`Grok empty reply, finish_reason: ${reason}`);
   }
 
   return reply;
@@ -167,9 +145,9 @@ async function saveMemoryAsync(
         content: `Transcript:\n${transcript}\n\nWrite a 2-3 sentence diary entry in Russian.`,
       },
     ];
-    const summary = await callGemini(apiKey, summaryMessages, {
+    const summary = await callGrok(apiKey, summaryMessages, {
       temperature: 0.4,
-      maxOutputTokens: 150,
+      max_tokens: 150,
     });
     if (!summary) return;
     await supabase.from('memories').insert({
@@ -196,9 +174,9 @@ Deno.serve(async (req: Request) => {
   }
 
   try {
-    const apiKey = Deno.env.get('GOOGLE_AI_KEY');
+    const apiKey = Deno.env.get('GROK_API_KEY');
     if (!apiKey) {
-      return json(500, { error: 'GOOGLE_AI_KEY is not configured' });
+      return json(500, { error: 'GROK_API_KEY is not configured' });
     }
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -262,9 +240,9 @@ Deno.serve(async (req: Request) => {
     }
     finalMessages.push(...messages);
 
-    const reply = await callGemini(apiKey, finalMessages, {
+    const reply = await callGrok(apiKey, finalMessages, {
       temperature: 0.9,
-      maxOutputTokens: 300,
+      max_tokens: 300,
     });
 
     if (girlId && userId) {
@@ -285,7 +263,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return json(200, { reply, model: GEMINI_MODEL });
+    return json(200, { reply, model: GROK_MODEL });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[chat-ai] fatal:', message);
