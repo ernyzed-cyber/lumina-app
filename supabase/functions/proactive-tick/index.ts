@@ -289,8 +289,10 @@ async function processPair(
   const persona = personaRes.data.system_prompt as string;
 
   const localTime = computeLocalTime(timezone);
+
+  console.log(`[proactive-tick] pair ${pair.user_id.slice(0,8)}/${pair.girl_id} | mode=${localTime.mode} | tz=${timezone} | local=${localTime.human}`);
+
   if (localTime.mode === 'sleep') {
-    // Девушка спит — просто сдвигаем следующий ролл.
     await supabase.from('user_girl_state').upsert({
       user_id: pair.user_id,
       girl_id: pair.girl_id,
@@ -304,36 +306,44 @@ async function processPair(
   const lastUser = pair.last_user_message_at ? new Date(pair.last_user_message_at).getTime() : 0;
   const lastOwn = pair.last_assistant_message_at ? new Date(pair.last_assistant_message_at).getTime() : 0;
 
-  // Определяем триггер в порядке приоритета.
+  const minsSinceUser = lastUser ? Math.round((now - lastUser) / 60_000) : null;
+  const hoursSinceOwn = lastOwn ? (now - lastOwn) / 3600_000 : null;
+
+  console.log(`[proactive-tick] pair ${pair.user_id.slice(0,8)}/${pair.girl_id} | lastUser=${pair.last_user_message_at} (${minsSinceUser}min ago) | lastOwn=${pair.last_assistant_message_at} (${hoursSinceOwn?.toFixed(1)}h ago) | lastUser>lastOwn=${lastUser > lastOwn}`);
+
   let trigger: Trigger | null = null;
   let hoursSinceLastOwn: number | undefined;
 
-  // 1. Morning: юзер писал последним, и он писал пока она спала (т.е. уже позже чем её ответ).
-  //    Момент "спала" — приближённо: с тех пор как он написал, прошло хотя бы 30 минут.
+  // 1. Morning
   if (lastUser > lastOwn && lastUser > 0 && now - lastUser >= MORNING_SINCE_USER_MIN_MINUTES * 60_000) {
     trigger = 'morning';
+    console.log(`[proactive-tick] → trigger=morning`);
   }
 
-  // 2. Silence: её последнее сообщение висит без ответа >6ч.
+  // 2. Silence
   if (!trigger && lastOwn > 0 && lastOwn >= lastUser && now - lastOwn >= SILENCE_HOURS_THRESHOLD * 3600_000) {
-    if (Math.random() < SILENCE_CHANCE) {
+    const roll = Math.random();
+    console.log(`[proactive-tick] silence check: roll=${roll.toFixed(3)} need<${SILENCE_CHANCE}`);
+    if (roll < SILENCE_CHANCE) {
       trigger = 'silence';
       hoursSinceLastOwn = (now - lastOwn) / 3600_000;
     }
   }
 
-  // 3. Random roll.
+  // 3. Random roll
   if (!trigger) {
     const chance = ROLL_CHANCE[localTime.mode];
-    if (Math.random() < chance) {
+    const roll = Math.random();
+    console.log(`[proactive-tick] random check: mode=${localTime.mode} roll=${roll.toFixed(3)} need<${chance}`);
+    if (roll < chance) {
       trigger = 'random';
     }
   }
 
-  // Следующий ролл в любом случае сдвигаем.
   const nextRoll = new Date(now + ROLL_INTERVAL_HOURS * 3600_000).toISOString();
 
   if (!trigger) {
+    console.log(`[proactive-tick] → no_trigger, next roll at ${nextRoll}`);
     await supabase.from('user_girl_state').upsert({
       user_id: pair.user_id,
       girl_id: pair.girl_id,
