@@ -102,24 +102,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
 
     try {
-      const [notifRes, msgRes] = await Promise.all([
-        supabase
-          .from('notifications')
-          .select('id', { count: 'exact', head: true })
-          .eq('user_id', user.id)
-          .eq('read', false),
-        supabase
-          .from('messages')
-          .select('id', { count: 'exact', head: true })
-          .eq('recipient_id', user.id)
-          .eq('read', false),
-      ]);
+      // Запрашиваем только notifications.read — эта колонка точно есть.
+      // messages не запрашиваем через БД: колонки read/recipient_id могут отсутствовать.
+      // Счётчик сообщений ведём локально через realtime (см. подписку ниже).
+      const notifRes = await supabase
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('read', false);
 
       if (!notifRes.error) {
         setUnreadNotifications(notifRes.count ?? 0);
-      }
-      if (!msgRes.error) {
-        setUnreadMessages(msgRes.count ?? 0);
       }
     } catch {
       // silent — сохраняем предыдущее значение
