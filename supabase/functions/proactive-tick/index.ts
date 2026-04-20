@@ -354,7 +354,7 @@ async function processPair(
   }
 
   try {
-    // Грузим профиль, memories, последние N сообщений.
+    console.log(`[proactive-tick] → calling Grok for ${pair.user_id.slice(0,8)}/${pair.girl_id} trigger=${trigger}`);
     const [profileRes, memoriesRes, recentRes] = await Promise.all([
       supabase.from('profiles').select('*').eq('id', pair.user_id).maybeSingle(),
       supabase
@@ -389,6 +389,8 @@ async function processPair(
       { role: 'system', content: systemPrompt },
       { role: 'user', content: 'Напиши сообщение как описано выше. Только текст сообщения, без кавычек и префиксов.' },
     ], { temperature: 0.95, max_tokens: 220 });
+
+    console.log(`[proactive-tick] Grok reply (${reply.length} chars): "${reply.slice(0, 80)}..."`);
 
     if (!reply || reply.length < 2) {
       await supabase.from('user_girl_state').upsert({
