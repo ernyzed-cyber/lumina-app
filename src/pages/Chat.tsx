@@ -212,6 +212,8 @@ export default function Chat() {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isTyping, setIsTyping] = useState(false);
+  /** Динамический статус собеседницы: online пока идёт разговор, иначе offline ("была недавно"). */
+  const [liveOnline, setLiveOnline] = useState(false);
   const [currentGirl, setCurrentGirl] = useState<Girl | null>(null);
   const [dialogsOpen, setDialogsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -475,8 +477,10 @@ export default function Chat() {
         ),
       );
 
-      // Show typing indicator
-      setIsTyping(true);
+      // Статус будет управляться расписанием с сервера:
+      // фаза "игнор" (offline) → "в сети" (online) → "печатает" (typing) → ответ.
+      setIsTyping(false);
+      setLiveOnline(false);
 
       try {
         // Last 8 messages for context
@@ -505,12 +509,43 @@ export default function Chat() {
         }
 
         const data = await res.json();
+
+        // Sleep-режим: девушка спит, сервер намеренно не ответил.
+        // Ничего не показываем — ни "онлайн", ни "печатает". Сообщение юзера
+        // остаётся, утром сработает проактивность ("привет, я спала...").
+        if (data?.skipped === 'sleep') {
+          console.log('[chat-ai] sleep-skip:', data?.local_time);
+          return;
+        }
+
         const rawReply = data?.reply
           ?? data?.choices?.[0]?.message?.content
           ?? data?.content
           ?? '';
         const replyFull = (typeof rawReply === 'string' ? rawReply.trim() : '')
           || t('chat.aiFallbackReply');
+
+        // Расписание показа: сервер даёт ignore/online/typing в мс.
+        // Fallback если по какой-то причине нет schedule: короткие дефолты.
+        const schedule = (data?.schedule as
+          | { ignoreMs: number; onlineMs: number; typingMs: number }
+          | undefined) ?? {
+          ignoreMs: 2000,
+          onlineMs: 4000,
+          typingMs: 3000,
+        };
+
+        // Фаза 1: "игнор" — статус offline, ничего не показываем.
+        await new Promise((r) => setTimeout(r, schedule.ignoreMs));
+
+        // Фаза 2: "в сети" — она увидела чат, думает как ответить.
+        setLiveOnline(true);
+        await new Promise((r) => setTimeout(r, schedule.onlineMs));
+
+        // Фаза 3: "печатает" — индикатор typing, всё ещё online.
+        setIsTyping(true);
+        await new Promise((r) => setTimeout(r, schedule.typingMs));
+        setIsTyping(false);
 
         // Разбиваем на сегменты: модели разрешено слать несколько сообщений через \n\n.
         // Отсекаем пустые, ограничиваем максимум 3 сегмента.
@@ -526,9 +561,6 @@ export default function Chat() {
 
         for (let i = 0; i < segments.length; i++) {
           const seg = segments[i];
-          setIsTyping(true);
-          await new Promise((r) => setTimeout(r, paceDelay(seg)));
-          setIsTyping(false);
 
           const aiMsg: Message = {
             id: genId(),
@@ -539,11 +571,17 @@ export default function Chat() {
           setMessages((prev) => [...prev, aiMsg]);
           saveMessage('assistant', seg);
 
-          // Маленькая пауза между сообщениями (не перед первым)
+          // Перед следующим сегментом — короткая "печать"
           if (i < segments.length - 1) {
-            await new Promise((r) => setTimeout(r, 350));
+            setIsTyping(true);
+            await new Promise((r) => setTimeout(r, paceDelay(segments[i + 1])));
+            setIsTyping(false);
+            await new Promise((r) => setTimeout(r, 250));
           }
         }
+
+        // После ответа ещё ~90с держим online, потом "была недавно".
+        setTimeout(() => setLiveOnline(false), 90_000);
 
         const lastSeg = segments[segments.length - 1] ?? replyFull;
         // Update dialog preview with last segment
@@ -559,7 +597,10 @@ export default function Chat() {
         const fallbackReplies: string[] = tr.chat.fallbackReplies;
         const fallback = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
 
+        setLiveOnline(true);
+        setIsTyping(true);
         setTimeout(() => {
+          setIsTyping(false);
           const aiMsg: Message = {
             id: genId(),
             role: 'assistant',
@@ -568,7 +609,8 @@ export default function Chat() {
           };
           setMessages((prev) => [...prev, aiMsg]);
           saveMessage('assistant', fallback);
-        }, 800);
+          setTimeout(() => setLiveOnline(false), 30_000);
+        }, 1200);
       } finally {
         setTimeout(() => setIsTyping(false), 400);
       }
@@ -744,7 +786,7 @@ export default function Chat() {
                 src={currentGirl.photo}
                 alt={currentGirl.name}
                 size="sm"
-                online={currentGirl.online}
+                online={liveOnline}
               />
             </button>
 
@@ -754,7 +796,7 @@ export default function Chat() {
                 <span role="status" aria-live="assertive">
                 {isTyping ? (
                   t('chat.statusTyping')
-                ) : currentGirl.online ? (
+                ) : liveOnline ? (
                   <>
                     <span className={s.statusDot} />
                     {t('chat.statusOnline')}

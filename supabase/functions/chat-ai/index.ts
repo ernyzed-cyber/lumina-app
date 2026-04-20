@@ -36,6 +36,68 @@ const MEMORY_LIMIT = 3;
 const SUMMARY_TRIGGER = 6;
 
 // ---------------------------------------------------------------------------
+// Response timing (имитация живого человека)
+// ignore  — она "не видит" сообщение (offline/была недавно)
+// online  — она увидела чат, формулирует ответ (в сети)
+// typing  — набирает (печатает...)
+// Финальный ответ приходит по сумме этих трёх.
+// ---------------------------------------------------------------------------
+
+interface ReplySchedule {
+  ignoreMs: number;
+  onlineMs: number;
+  typingMs: number;
+  totalMs: number;
+}
+
+function rand(min: number, max: number): number {
+  return Math.floor(min + Math.random() * (max - min));
+}
+
+function isInterestingTopic(text: string): boolean {
+  if (!text) return false;
+  if (text.length > 80) return true;
+  if (/[?？]/.test(text)) return true;
+  // эмоциональные/личные маркеры
+  if (/(люблю|скучаю|грустно|обидно|круто|классно|офигенно|бесит|ненавижу|спасибо|прости|целую|обнимаю|важно|серьёзно|страшно|рад|рада)/i.test(text)) return true;
+  return false;
+}
+
+function computeSchedule(mode: DayMode, lastUserText: string, replyText: string): ReplySchedule {
+  const interesting = isInterestingTopic(lastUserText);
+
+  // Базовые диапазоны задержки "игнора" перед тем как она "заметила".
+  // В мс.
+  let ignoreRange: [number, number];
+  if (mode === 'work') {
+    ignoreRange = interesting ? [45_000, 2 * 60_000] : [3 * 60_000, 8 * 60_000];
+  } else {
+    // rest
+    ignoreRange = interesting ? [15_000, 45_000] : [40_000, 2 * 60_000];
+  }
+
+  // "В сети" — обдумывает ответ. Короткое окно перед началом печати.
+  const onlineRange: [number, number] = mode === 'work'
+    ? [20_000, 55_000]
+    : [8_000, 25_000];
+
+  // "Печатает" — пропорционально длине ответа, но с нижней/верхней границей.
+  const charsPerSec = 12; // довольно бодрый набор на телефоне
+  const typingEstimate = Math.round((replyText.length / charsPerSec) * 1000);
+  const typingMs = Math.min(Math.max(typingEstimate, 6_000), 35_000);
+
+  const ignoreMs = rand(ignoreRange[0], ignoreRange[1]);
+  const onlineMs = rand(onlineRange[0], onlineRange[1]);
+
+  return {
+    ignoreMs,
+    onlineMs,
+    typingMs,
+    totalMs: ignoreMs + onlineMs + typingMs,
+  };
+}
+
+// ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
@@ -275,6 +337,7 @@ Deno.serve(async (req: Request) => {
     }
 
     let systemPrompt = '';
+    let dayMode: DayMode = 'rest';
 
     if (girlId && userId) {
       const [personaRes, profileRes, memoriesRes] = await Promise.all([
@@ -300,6 +363,7 @@ Deno.serve(async (req: Request) => {
       const memories = memoriesRes.data ?? [];
 
       const localTime = computeLocalTime(timezone);
+      dayMode = localTime.mode;
 
       console.log('[chat-ai] time debug', {
         timezone,
@@ -309,6 +373,30 @@ Deno.serve(async (req: Request) => {
         hour: localTime.hour,
         mode: localTime.mode,
       });
+
+      // SLEEP: она спит. Не зовём Grok вообще, не шлём никакой реплики,
+      // не меняем статус в UI. Сообщение юзера клиент уже сохранил в БД —
+      // утром проактивный тик разбудит диалог.
+      if (localTime.mode === 'sleep') {
+        // Обновим last_user_message_at, чтобы проактивность знала что есть непрочитанное.
+        const nowIso = new Date().toISOString();
+        await supabase.from('user_girl_state').upsert({
+          user_id: userId,
+          girl_id: girlId,
+          last_user_message_at: nowIso,
+          status: 'offline',
+          status_until: null,
+          updated_at: nowIso,
+        }, { onConflict: 'user_id,girl_id' });
+
+        return json(200, {
+          reply: null,
+          skipped: 'sleep',
+          mode: 'sleep',
+          city,
+          local_time: localTime.human,
+        });
+      }
 
       if (personaPrompt) {
         systemPrompt = [
@@ -347,7 +435,27 @@ Deno.serve(async (req: Request) => {
       max_tokens: 300,
     });
 
+    // Расписание показа ответа на клиенте (имитация живого собеседника).
+    const lastUserText = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+    const schedule = computeSchedule(dayMode, lastUserText, reply);
+
     if (girlId && userId) {
+      // Запоминаем состояние пары: сообщение пришло, начинается фаза "игнора".
+      // Статус станет 'online' только через ignoreMs (это делает клиент upsert'ом?
+      // Нет, клиент только читает. Поэтому сервер сразу планирует переходы через
+      // status_until. Для простоты первой итерации: держим offline, а клиент
+      // сам переключает локальный статус по расписанию. Realtime оставляем на будущее.
+      const nowIso = new Date().toISOString();
+      const untilIso = new Date(Date.now() + schedule.totalMs + 90_000).toISOString();
+      await supabase.from('user_girl_state').upsert({
+        user_id: userId,
+        girl_id: girlId,
+        last_user_message_at: nowIso,
+        status: 'offline',
+        status_until: untilIso,
+        updated_at: nowIso,
+      }, { onConflict: 'user_id,girl_id' });
+
       const fullDialog: ChatMessage[] = [
         ...messages,
         { role: 'assistant', content: reply },
@@ -365,7 +473,7 @@ Deno.serve(async (req: Request) => {
       }
     }
 
-    return json(200, { reply, model: GROK_MODEL });
+    return json(200, { reply, model: GROK_MODEL, schedule, mode: dayMode });
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Unknown error';
     console.error('[chat-ai] fatal:', message);
