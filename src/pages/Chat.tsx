@@ -365,10 +365,16 @@ export default function Chat() {
     return () => { cancelled = true; };
   }, [user, currentGirl]);
 
-  /* ── Auto-scroll to bottom ── */
+  /* ── Auto-scroll to bottom: instant on chat switch, smooth on new messages ── */
+  const prevGirlIdRef = useRef<string | null>(null);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isTyping]);
+    const switched = prevGirlIdRef.current !== (currentGirl?.id ?? null);
+    prevGirlIdRef.current = currentGirl?.id ?? null;
+    messagesEndRef.current?.scrollIntoView({
+      behavior: switched ? 'auto' : 'smooth',
+      block: 'end',
+    });
+  }, [messages, isTyping, currentGirl]);
 
   /* ── Close emoji picker on click outside ── */
   useEffect(() => {
@@ -740,12 +746,12 @@ export default function Chat() {
               tabIndex={0}
               onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchGirl(d.girl); } }}
             >
-              <Avatar src={d.girl.photo} alt={d.girl.name} size="sm" online={d.girl.online} />
+              <Avatar src={d.girl.photo} alt={d.girl.name} size="sm" online={currentGirl?.id === d.girl.id ? liveOnline : d.girl.online} />
               <div className={s.dialogInfo}>
                 <div className={s.dialogTop}>
                   <span className={s.dialogName}>
                     {d.girl.name}
-                    {d.girl.online && <span className={s.nameOnlineDot} />}
+                    {(currentGirl?.id === d.girl.id ? liveOnline : d.girl.online) && <span className={s.nameOnlineDot} />}
                   </span>
                   {d.time && <span className={s.dialogTime}>{d.time}</span>}
                 </div>
@@ -792,7 +798,7 @@ export default function Chat() {
 
             <div className={s.chatHeaderInfo}>
               <div className={s.chatHeaderName}>{currentGirl.name}</div>
-              <div className={`${s.chatHeaderStatus} ${isTyping ? s.typing : ''}`}>
+              <div className={`${s.chatHeaderStatus} ${isTyping ? s.typing : liveOnline ? s.online : s.offline}`}>
                 <span role="status" aria-live="assertive">
                 {isTyping ? (
                   t('chat.statusTyping')
