@@ -144,13 +144,22 @@ function buildTimeBlock(city: string, timezone: string, t: LocalTimeInfo): strin
     rest: 'Сейчас вечер — её свободное время. Она расслаблена, охотнее общается, может сама рассказать что-то про день.',
   };
   return [
-    `=== REAL TIME AWARENESS ===`,
-    `Alina's city: ${city} (${timezone}).`,
-    `Current local time for her: ${t.human} (24h).`,
-    `Current day mode: ${t.mode.toUpperCase()}.`,
-    `Weekend: ${t.isWeekend ? 'yes' : 'no'}.`,
-    `Behavior guidance: ${modeText[t.mode]}`,
-    `If user asks about time, day, or what she is doing — answer based on THIS time, not a guess. If she just woke up / is at work / is chilling — let that colour her reply naturally. Do NOT announce the exact clock time unless asked; mention parts of day instead ("утро", "обед", "вечер", "ночь уже").`,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    'REAL-WORLD FACTS (MUST USE EXACTLY AS WRITTEN):',
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    `• Your city: ${city}`,
+    `• Your timezone: ${timezone}`,
+    `• Current local time RIGHT NOW: ${t.human}`,
+    `• Day mode: ${t.mode} (sleep=01-07, work=07-17, rest=17-01)`,
+    `• Weekend: ${t.isWeekend ? 'yes' : 'no'}`,
+    '',
+    'ВАЖНО (RU):',
+    `— Ты живёшь в городе «${city}». НЕ придумывай другой город. Никаких Лондонов, Парижей и т.п.`,
+    `— Сейчас у тебя РОВНО: ${t.human}. Если спросят который час — называй ЭТО время, не выдумывай. Можно округлять до пяти минут ("около восьми вечера", "пол восьмого"), но час брать ТОЛЬКО отсюда.`,
+    `— Сегодняшняя дата — из строки выше. НЕ говори о прошедших праздниках как о будущих и наоборот.`,
+    `— Режим дня: ${t.mode} — ${modeText[t.mode]}`,
+    '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
+    '',
   ].join('\n');
 }
 
@@ -292,11 +301,19 @@ Deno.serve(async (req: Request) => {
 
       const localTime = computeLocalTime(timezone);
 
+      console.log('[chat-ai] time debug', {
+        timezone,
+        city,
+        now_utc: new Date().toISOString(),
+        human: localTime.human,
+        hour: localTime.hour,
+        mode: localTime.mode,
+      });
+
       if (personaPrompt) {
         systemPrompt = [
-          personaPrompt,
-          '',
           buildTimeBlock(city, timezone, localTime),
+          personaPrompt,
           '',
           '=== CONTEXT ABOUT INTERLOCUTOR ===',
           buildUserContextBlock(profile),
@@ -306,6 +323,9 @@ Deno.serve(async (req: Request) => {
           '',
           '=== MESSAGING STYLE ===',
           'You may split your reply into 1–3 short messages separated by a double newline (\\n\\n). Use multiple messages only when it feels natural: reaction then question, agreement then a second thought, a quick correction. Most replies are 1 message. Never force splitting.',
+          '',
+          '━━━ FINAL REMINDER ━━━',
+          `Your city is ${city}. Your local time is ${localTime.human}. Use these exact values if asked.`,
         ].join('\n');
       } else if (legacyPrompt) {
         systemPrompt = legacyPrompt;
