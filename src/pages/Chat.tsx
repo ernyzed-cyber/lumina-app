@@ -330,24 +330,30 @@ export default function Chat() {
       try {
         const { data, error } = await supabase
           .from('messages')
-          .select('*')
+          .select('id, role, content, created_at')
           .eq('user_id', user!.id)
           .eq('girl_id', currentGirl!.id)
           .order('created_at', { ascending: true })
-          .limit(50);
+          .order('id', { ascending: true })
+          .limit(200);
 
-        if (!cancelled && data && !error) {
+        if (error) {
+          console.error('[Chat] loadMessages error:', error);
+          return;
+        }
+
+        if (!cancelled && data) {
           setMessages(
-            data.map((row: { id: string; role: 'user' | 'assistant'; content: string; created_at: string }) => ({
-              id: row.id,
+            data.map((row: { id: string | number; role: string; content: string; created_at: string }) => ({
+              id: String(row.id),
               role: row.role as 'user' | 'assistant',
               content: row.content,
               timestamp: new Date(row.created_at),
             })),
           );
         }
-      } catch {
-        // If table not created yet — work with empty array
+      } catch (e) {
+        console.error('[Chat] loadMessages exception:', e);
       } finally {
         if (!cancelled) setLoadingMessages(false);
       }
@@ -414,14 +420,17 @@ export default function Chat() {
     async (role: 'user' | 'assistant', content: string) => {
       if (!user || !currentGirl) return;
       try {
-        await supabase.from('messages').insert({
+        const { error } = await supabase.from('messages').insert({
           user_id: user.id,
           girl_id: currentGirl.id,
           role,
           content,
         });
-      } catch {
-        // fallback — message already added locally
+        if (error) {
+          console.error('[Chat] saveMessage error:', error);
+        }
+      } catch (e) {
+        console.error('[Chat] saveMessage exception:', e);
       }
     },
     [user, currentGirl],

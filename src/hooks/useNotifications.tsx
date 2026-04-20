@@ -109,7 +109,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         .from('notifications')
         .select('id', { count: 'exact', head: true })
         .eq('user_id', user.id)
-        .eq('read', false);
+        .eq('is_read', false);
 
       if (!notifRes.error) {
         setUnreadNotifications(notifRes.count ?? 0);
@@ -142,22 +142,25 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           const row = payload.new as {
             id: string;
             type: string;
-            avatar: string;
-            name: string;
-            text: string;
             created_at: string;
-            read: boolean;
-            girl_id?: string;
+            is_read: boolean;
+            data?: {
+              avatar?: string;
+              name?: string;
+              text?: string;
+              girl_id?: string;
+            };
           };
+          const data = row.data ?? {};
           const n: AppNotification = {
             id: row.id,
             type: row.type as NotificationType,
-            avatar: row.avatar,
-            name: row.name,
-            text: row.text,
+            avatar: data.avatar ?? '',
+            name: data.name ?? '',
+            text: data.text ?? '',
             time: row.created_at,
-            read: row.read,
-            girl_id: row.girl_id,
+            read: row.is_read,
+            girl_id: data.girl_id,
           };
           setLastNotification(n);
           if (!n.read) {
@@ -172,10 +175,14 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           event: 'INSERT',
           schema: 'public',
           table: 'messages',
-          filter: `recipient_id=eq.${user.id}`,
+          filter: `user_id=eq.${user.id}`,
         },
-        () => {
-          setUnreadMessages((c) => c + 1);
+        (payload) => {
+          const row = payload.new as { role?: string };
+          // Считаем только входящие от ИИ, не исходящие от юзера
+          if (row.role === 'assistant') {
+            setUnreadMessages((c) => c + 1);
+          }
         },
       )
       .subscribe();
