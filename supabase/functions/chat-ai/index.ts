@@ -81,6 +81,79 @@ async function callGrok(
   return reply;
 }
 
+/**
+ * Режим дня девушки. Используется и для промпта, и для логики проактивности.
+ *   sleep: 01:00–07:00  — не должна отвечать бодро, минимум инициативы
+ *   work:  07:00–17:00  — занята, отвечает с задержкой, редко пишет первой
+ *   rest:  17:00–01:00  — свободна, живее отвечает, охотнее инициирует
+ */
+type DayMode = 'sleep' | 'work' | 'rest';
+
+interface LocalTimeInfo {
+  iso: string;       // 2026-04-21T14:37:00+03:00
+  human: string;     // вторник, 21 апреля, 14:37
+  hour: number;      // 0..23 локальный час
+  weekday: number;   // 1..7 (пн=1)
+  mode: DayMode;
+  isWeekend: boolean;
+}
+
+const WEEKDAYS_RU = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
+const MONTHS_RU = [
+  'января', 'февраля', 'марта', 'апреля', 'мая', 'июня',
+  'июля', 'августа', 'сентября', 'октября', 'ноября', 'декабря',
+];
+
+function computeLocalTime(timezone: string): LocalTimeInfo {
+  const now = new Date();
+  // Через Intl достаём компоненты в нужной TZ.
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit',
+    hour12: false, weekday: 'short',
+  }).formatToParts(now);
+
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
+  const year = Number(get('year'));
+  const month = Number(get('month'));
+  const day = Number(get('day'));
+  const hour = Number(get('hour')) % 24;
+  const minute = Number(get('minute'));
+
+  // JS-день недели из даты в TZ. Берём dateString и парсим без времени, чтобы не поплыло.
+  const jsDow = new Date(`${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T12:00:00Z`).getUTCDay();
+  const weekday = jsDow === 0 ? 7 : jsDow; // 1..7
+  const isWeekend = weekday === 6 || weekday === 7;
+
+  let mode: DayMode;
+  if (hour >= 1 && hour < 7) mode = 'sleep';
+  else if (hour >= 7 && hour < 17) mode = 'work';
+  else mode = 'rest';
+
+  const human = `${WEEKDAYS_RU[jsDow]}, ${day} ${MONTHS_RU[month - 1]}, ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+  const iso = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`;
+
+  return { iso, human, hour, weekday, mode, isWeekend };
+}
+
+function buildTimeBlock(city: string, timezone: string, t: LocalTimeInfo): string {
+  const modeText: Record<DayMode, string> = {
+    sleep: 'Сейчас ночь по её местному времени — обычно она в это время спит. Если вдруг отвечает — сонная, короткая, немного раздражённая или наоборот тёплая если соскучилась.',
+    work: 'Сейчас её рабочее время (будни) / дневные дела (выходные). Она занята, может ответить не сразу, ответы короткие и по делу. Если тема её цепляет — оживляется.',
+    rest: 'Сейчас вечер — её свободное время. Она расслаблена, охотнее общается, может сама рассказать что-то про день.',
+  };
+  return [
+    `=== REAL TIME AWARENESS ===`,
+    `Alina's city: ${city} (${timezone}).`,
+    `Current local time for her: ${t.human} (24h).`,
+    `Current day mode: ${t.mode.toUpperCase()}.`,
+    `Weekend: ${t.isWeekend ? 'yes' : 'no'}.`,
+    `Behavior guidance: ${modeText[t.mode]}`,
+    `If user asks about time, day, or what she is doing — answer based on THIS time, not a guess. If she just woke up / is at work / is chilling — let that colour her reply naturally. Do NOT announce the exact clock time unless asked; mention parts of day instead ("утро", "обед", "вечер", "ночь уже").`,
+  ].join('\n');
+}
+
 function buildUserContextBlock(profile: Record<string, unknown> | null): string {
   if (!profile) {
     return 'You are talking to a new person, you know nothing about him yet. Get to know him naturally.';
@@ -198,7 +271,7 @@ Deno.serve(async (req: Request) => {
       const [personaRes, profileRes, memoriesRes] = await Promise.all([
         supabase
           .from('girl_personas')
-          .select('system_prompt, name')
+          .select('system_prompt, name, timezone, city')
           .eq('id', girlId)
           .maybeSingle(),
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
@@ -212,18 +285,27 @@ Deno.serve(async (req: Request) => {
       ]);
 
       const personaPrompt = personaRes.data?.system_prompt;
+      const timezone = (personaRes.data?.timezone as string) || 'Europe/Moscow';
+      const city = (personaRes.data?.city as string) || 'Москва';
       const profile = profileRes.data ?? null;
       const memories = memoriesRes.data ?? [];
+
+      const localTime = computeLocalTime(timezone);
 
       if (personaPrompt) {
         systemPrompt = [
           personaPrompt,
+          '',
+          buildTimeBlock(city, timezone, localTime),
           '',
           '=== CONTEXT ABOUT INTERLOCUTOR ===',
           buildUserContextBlock(profile),
           '',
           '=== MEMORY ===',
           buildMemoryBlock(memories),
+          '',
+          '=== MESSAGING STYLE ===',
+          'You may split your reply into 1–3 short messages separated by a double newline (\\n\\n). Use multiple messages only when it feels natural: reaction then question, agreement then a second thought, a quick correction. Most replies are 1 message. Never force splitting.',
         ].join('\n');
       } else if (legacyPrompt) {
         systemPrompt = legacyPrompt;

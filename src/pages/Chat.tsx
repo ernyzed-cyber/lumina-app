@@ -509,23 +509,48 @@ export default function Chat() {
           ?? data?.choices?.[0]?.message?.content
           ?? data?.content
           ?? '';
-        const reply = (typeof rawReply === 'string' ? rawReply.trim() : '')
+        const replyFull = (typeof rawReply === 'string' ? rawReply.trim() : '')
           || t('chat.aiFallbackReply');
 
-        const aiMsg: Message = {
-          id: genId(),
-          role: 'assistant',
-          content: reply,
-          timestamp: new Date(),
-        };
-        setMessages((prev) => [...prev, aiMsg]);
-        saveMessage('assistant', reply);
+        // Разбиваем на сегменты: модели разрешено слать несколько сообщений через \n\n.
+        // Отсекаем пустые, ограничиваем максимум 3 сегмента.
+        const segments = replyFull
+          .split(/\n{2,}/)
+          .map((s) => s.trim())
+          .filter(Boolean)
+          .slice(0, 3);
 
-        // Update dialog preview with AI reply
+        // Пауза между сегментами: зависит от длины следующего, имитирует набор текста.
+        const paceDelay = (text: string) =>
+          Math.min(600 + text.length * 25, 2800);
+
+        for (let i = 0; i < segments.length; i++) {
+          const seg = segments[i];
+          setIsTyping(true);
+          await new Promise((r) => setTimeout(r, paceDelay(seg)));
+          setIsTyping(false);
+
+          const aiMsg: Message = {
+            id: genId(),
+            role: 'assistant',
+            content: seg,
+            timestamp: new Date(),
+          };
+          setMessages((prev) => [...prev, aiMsg]);
+          saveMessage('assistant', seg);
+
+          // Маленькая пауза между сообщениями (не перед первым)
+          if (i < segments.length - 1) {
+            await new Promise((r) => setTimeout(r, 350));
+          }
+        }
+
+        const lastSeg = segments[segments.length - 1] ?? replyFull;
+        // Update dialog preview with last segment
         setDialogs((prev) =>
           prev.map((d) =>
             d.girl.id === currentGirl.id
-              ? { ...d, lastMessage: reply.length > 50 ? reply.slice(0, 50) + '...' : reply, time: 'now' }
+              ? { ...d, lastMessage: lastSeg.length > 50 ? lastSeg.slice(0, 50) + '...' : lastSeg, time: 'now' }
               : d,
           ),
         );
