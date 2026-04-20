@@ -224,6 +224,7 @@ export default function Chat() {
   const [msgLimits, setMsgLimits] = useState<MsgLimits>(loadMsgLimits);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const giftPickerRef = useRef<HTMLDivElement>(null);
@@ -365,23 +366,32 @@ export default function Chat() {
     return () => { cancelled = true; };
   }, [user, currentGirl]);
 
-  /* ── Auto-scroll to bottom: instant после загрузки чата, smooth при новых сообщениях ── */
-  const justLoadedRef = useRef(false);
-  useEffect(() => {
-    // Как только начинается загрузка нового чата — взвести флаг "следующий скролл мгновенный"
-    if (loadingMessages) {
-      justLoadedRef.current = true;
-    }
-  }, [loadingMessages, currentGirl?.id]);
+  /* ── Auto-scroll to bottom ── */
+  // При смене чата (currentGirl меняется) — мгновенно в конец без анимации.
+  // При новом сообщении в уже открытом чате — плавно.
+  const prevGirlIdRef = useRef<string | undefined>(undefined);
+  const initialScrollDoneRef = useRef(false);
 
+  // Сбрасываем флаг при смене чата
   useEffect(() => {
-    const instant = justLoadedRef.current;
-    justLoadedRef.current = false;
-    messagesEndRef.current?.scrollIntoView({
-      behavior: instant ? 'auto' : 'smooth',
-      block: 'end',
-    });
-  }, [messages, isTyping]);
+    initialScrollDoneRef.current = false;
+    prevGirlIdRef.current = currentGirl?.id;
+  }, [currentGirl?.id]);
+
+  // Когда загрузка завершилась — мгновенно прыгаем в конец (первый раз для этого чата)
+  useEffect(() => {
+    if (loadingMessages) return;
+    if (initialScrollDoneRef.current) return;
+    initialScrollDoneRef.current = true;
+    if (!messagesAreaRef.current) return;
+    messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
+  }, [loadingMessages]);
+
+  // Плавный скролл при каждом новом сообщении/typing ПОСЛЕ первоначального скролла
+  useEffect(() => {
+    if (!initialScrollDoneRef.current) return;
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [messages, isTyping]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Close emoji picker on click outside ── */
   useEffect(() => {
@@ -859,7 +869,7 @@ export default function Chat() {
           </div>
         ) : (
           <>
-            <div className={s.messagesArea} role="log" aria-label={t('chat.messagesAriaLabel')} aria-live="polite">
+            <div ref={messagesAreaRef} className={s.messagesArea} role="log" aria-label={t('chat.messagesAriaLabel')} aria-live="polite">
               {messages.length === 0 && !isTyping && (
                 <div className={s.emptyChat}>
                   <div className={s.emptyChatIcon}>
