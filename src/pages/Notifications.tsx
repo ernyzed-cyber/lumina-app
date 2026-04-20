@@ -198,22 +198,27 @@ export default function Notifications() {
               (row: {
                 id: string;
                 type: string;
-                avatar: string;
-                name: string;
-                text: string;
                 created_at: string;
-                read: boolean;
-                girl_id?: string;
-              }) => ({
-                id: row.id,
-                type: row.type as NotificationType,
-                avatar: row.avatar,
-                name: row.name,
-                text: row.text,
-                time: row.created_at,
-                read: row.read,
-                girl_id: row.girl_id,
-              }),
+                is_read: boolean;
+                data?: {
+                  avatar?: string;
+                  name?: string;
+                  text?: string;
+                  girl_id?: string;
+                };
+              }) => {
+                const d = row.data ?? {};
+                return {
+                  id: row.id,
+                  type: row.type as NotificationType,
+                  avatar: d.avatar ?? '',
+                  name: d.name ?? '',
+                  text: d.text ?? '',
+                  time: row.created_at,
+                  read: row.is_read,
+                  girl_id: d.girl_id,
+                };
+              },
             ),
           );
         } else if (!cancelled) {
@@ -248,7 +253,7 @@ export default function Notifications() {
         try {
           await supabase
             .from('notifications')
-            .update({ read: true })
+            .update({ is_read: true })
             .eq('id', id)
             .eq('user_id', user.id);
           refresh();
@@ -270,7 +275,7 @@ export default function Notifications() {
       try {
         await supabase
           .from('notifications')
-          .update({ read: true })
+          .update({ is_read: true })
           .eq('user_id', user.id);
         refresh();
       } catch {
@@ -303,7 +308,8 @@ export default function Notifications() {
     (n: Notification) => {
       markAsRead(n.id);
 
-      if (n.type === 'message' && n.girl_id) {
+      // Любое уведомление с girl_id → переход в чат с этой девушкой
+      if (n.girl_id) {
         navigate(`/chat?girl=${n.girl_id}`);
       }
     },

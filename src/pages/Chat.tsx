@@ -119,7 +119,7 @@ export default function Chat() {
   const { t, tr, lang } = useLanguage();
   const { user, session, loading: authLoading } = useAuth();
   const { isVerified: telegramVerified } = useTelegramVerified();
-  const { resetMessages } = useNotifications();
+  const { resetMessages, unreadNotifications } = useNotifications();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -729,7 +729,9 @@ export default function Chat() {
                 <p className={s.dialogPreview}>{t('chat.notificationsPreview')}</p>
                 <div className={s.dialogBadges}>
                   <Star size={14} className={s.starIcon} fill="currentColor" />
-                  <span className={s.unreadBadge}>1</span>
+                  {unreadNotifications > 0 && (
+                    <span className={s.unreadBadge}>{unreadNotifications}</span>
+                  )}
                 </div>
               </div>
             </div>
