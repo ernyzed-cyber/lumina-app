@@ -390,7 +390,13 @@ export default function Chat() {
   // Плавный скролл при каждом новом сообщении/typing ПОСЛЕ первоначального скролла
   useEffect(() => {
     if (!initialScrollDoneRef.current) return;
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    el.style.scrollBehavior = 'smooth';
+    el.scrollTop = el.scrollHeight;
+    // Убираем smooth обратно после анимации чтобы не мешал следующему instant-скроллу
+    const t = setTimeout(() => { el.style.scrollBehavior = 'auto'; }, 400);
+    return () => clearTimeout(t);
   }, [messages, isTyping]); // eslint-disable-line react-hooks/exhaustive-deps
 
   /* ── Close emoji picker on click outside ── */
