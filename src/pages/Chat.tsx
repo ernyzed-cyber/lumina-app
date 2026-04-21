@@ -401,31 +401,43 @@ export default function Chat() {
   }, [user, currentGirl]);
 
   /* ── Auto-scroll ──
-     Поведение: НЕ скроллим при первоначальной загрузке/refresh — юзер видит ту
-     позицию которую видел раньше. Скроллим в конец только когда в уже открытом
-     чате появилось новое сообщение (или пошёл typing). */
+     Поведение:
+     - При открытии/refresh чата: МГНОВЕННО прыгаем в конец (без анимации, глазам
+       не видно — чат сразу открыт на последних сообщениях).
+     - При новом сообщении в уже открытом чате: плавно скроллим к нему.
+     - Typing-индикатор: скроллим только если юзер уже внизу. */
   const prevMessageCountRef = useRef(0);
   const prevGirlIdForScrollRef = useRef<string | undefined>(undefined);
+  const initialJumpDoneRef = useRef(false);
 
-  // При смене чата: сбрасываем счётчик, ничего не скроллим.
+  // При смене чата — сброс.
   useEffect(() => {
     prevMessageCountRef.current = 0;
     prevGirlIdForScrollRef.current = currentGirl?.id;
+    initialJumpDoneRef.current = false;
   }, [currentGirl?.id]);
 
-  // После первой загрузки messages из БД: зафиксировать базовый счётчик БЕЗ скролла.
+  // Первичная загрузка завершилась — мгновенный прыжок в конец, без анимации.
+  // useLayoutEffect аналог через прямое присваивание scrollTop + scrollBehavior='auto'.
   useEffect(() => {
     if (loadingMessages) return;
-    if (prevGirlIdForScrollRef.current !== currentGirl?.id) return;
-    // Если счётчик 0 — это первый набор сообщений после загрузки, просто запоминаем длину.
-    if (prevMessageCountRef.current === 0 && messages.length > 0) {
-      prevMessageCountRef.current = messages.length;
-    }
-  }, [loadingMessages, messages.length, currentGirl?.id]);
+    if (initialJumpDoneRef.current) return;
+    if (messages.length === 0) return;
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    el.style.scrollBehavior = 'auto';
+    el.scrollTop = el.scrollHeight;
+    // На всякий случай ещё раз после rAF — DOM мог ещё не дорисовать высоту.
+    requestAnimationFrame(() => {
+      el.scrollTop = el.scrollHeight;
+    });
+    prevMessageCountRef.current = messages.length;
+    initialJumpDoneRef.current = true;
+  }, [loadingMessages, messages.length]);
 
-  // Скролл только когда появилось НОВОЕ сообщение (длина выросла относительно запомненной).
+  // Новое сообщение в уже открытом чате → плавный скролл.
   useEffect(() => {
-    if (loadingMessages) return;
+    if (!initialJumpDoneRef.current) return;
     if (messages.length <= prevMessageCountRef.current) return;
     prevMessageCountRef.current = messages.length;
     const el = messagesAreaRef.current;
@@ -434,11 +446,12 @@ export default function Chat() {
     el.scrollTop = el.scrollHeight;
     const tm = setTimeout(() => { el.style.scrollBehavior = 'auto'; }, 400);
     return () => clearTimeout(tm);
-  }, [messages.length, loadingMessages]);
+  }, [messages.length]);
 
-  // Typing-индикатор: скроллим к нему только если юзер уже внизу (не отрывать его от чтения выше).
+  // Typing — скроллим только если юзер уже внизу.
   useEffect(() => {
     if (!isTyping) return;
+    if (!initialJumpDoneRef.current) return;
     const el = messagesAreaRef.current;
     if (!el) return;
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
