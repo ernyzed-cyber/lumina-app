@@ -323,6 +323,28 @@ export default function Chat() {
     loadDialogs();
   }, [user, girls, t]);
 
+  /* ── Обновить превью текущего диалога когда приходят новые сообщения ── */
+  useEffect(() => {
+    if (!currentGirl || messages.length === 0) return;
+    const last = messages[messages.length - 1];
+    const d = new Date(last.timestamp);
+    const now = new Date();
+    const diff = now.getTime() - d.getTime();
+    let timeStr: string;
+    if (diff < 60000) timeStr = 'now';
+    else if (diff < 3600000) timeStr = `${Math.floor(diff / 60000)}m`;
+    else if (diff < 86400000) timeStr = `${Math.floor(diff / 3600000)}h`;
+    else timeStr = `${Math.floor(diff / 86400000)}d`;
+    const preview = last.content.length > 50 ? last.content.slice(0, 50) + '...' : last.content;
+    setDialogs((prev) =>
+      prev.map((d) =>
+        d.girl.id === currentGirl.id
+          ? { ...d, lastMessage: preview, time: timeStr }
+          : d,
+      ),
+    );
+  }, [messages, currentGirl]);
+
   /* ── Load messages from Supabase ── */
   useEffect(() => {
     if (!user || !currentGirl) return;
