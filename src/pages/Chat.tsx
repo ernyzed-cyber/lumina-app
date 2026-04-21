@@ -354,13 +354,15 @@ export default function Chat() {
       setLoadingMessages(true);
       console.log('[Chat] loadMessages START', { userId: user!.id, girlId: currentGirl!.id });
       try {
+        // ВАЖНО: берём ПОСЛЕДНИЕ 200 сообщений, а не первые.
+        // Сортируем DESC + limit, потом разворачиваем в UI-порядок (старые сверху, новые снизу).
         const { data, error } = await supabase
           .from('messages')
           .select('id, role, content, created_at')
           .eq('user_id', user!.id)
           .eq('girl_id', currentGirl!.id)
-          .order('created_at', { ascending: true })
-          .order('id', { ascending: true })
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
           .limit(200);
 
         if (error) {
@@ -368,16 +370,18 @@ export default function Chat() {
           return;
         }
 
+        const ordered = (data ?? []).slice().reverse();
+
         console.log('[Chat] loadMessages RESULT', {
-          count: data?.length ?? 0,
-          first: data?.[0]?.created_at,
-          last: data?.[data.length - 1]?.created_at,
+          count: ordered.length,
+          first: ordered[0]?.created_at,
+          last: ordered[ordered.length - 1]?.created_at,
           cancelled,
         });
 
-        if (!cancelled && data) {
+        if (!cancelled) {
           setMessages(
-            data.map((row: { id: string | number; role: string; content: string; created_at: string }) => ({
+            ordered.map((row: { id: string | number; role: string; content: string; created_at: string }) => ({
               id: String(row.id),
               role: row.role as 'user' | 'assistant',
               content: row.content,
@@ -396,40 +400,54 @@ export default function Chat() {
     return () => { cancelled = true; };
   }, [user, currentGirl]);
 
-  /* ── Auto-scroll to bottom ── */
-  // При смене чата (currentGirl меняется) — мгновенно в конец без анимации.
-  // При новом сообщении в уже открытом чате — плавно.
-  const prevGirlIdRef = useRef<string | undefined>(undefined);
-  const initialScrollDoneRef = useRef(false);
+  /* ── Auto-scroll ──
+     Поведение: НЕ скроллим при первоначальной загрузке/refresh — юзер видит ту
+     позицию которую видел раньше. Скроллим в конец только когда в уже открытом
+     чате появилось новое сообщение (или пошёл typing). */
+  const prevMessageCountRef = useRef(0);
+  const prevGirlIdForScrollRef = useRef<string | undefined>(undefined);
 
-  // Сбрасываем флаг при смене чата
+  // При смене чата: сбрасываем счётчик, ничего не скроллим.
   useEffect(() => {
-    initialScrollDoneRef.current = false;
-    prevGirlIdRef.current = currentGirl?.id;
+    prevMessageCountRef.current = 0;
+    prevGirlIdForScrollRef.current = currentGirl?.id;
   }, [currentGirl?.id]);
 
-  // Когда загрузка завершилась — мгновенно прыгаем в конец (первый раз для этого чата)
+  // После первой загрузки messages из БД: зафиксировать базовый счётчик БЕЗ скролла.
   useEffect(() => {
     if (loadingMessages) return;
-    if (initialScrollDoneRef.current) return;
-    initialScrollDoneRef.current = true;
-    // Автоскролл в конец при первом открытии отключён временно для диагностики:
-    // оставляем позицию наверху чтобы визуально было понятно загрузились ли новые сообщения.
-    // if (!messagesAreaRef.current) return;
-    // messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
-  }, [loadingMessages]);
+    if (prevGirlIdForScrollRef.current !== currentGirl?.id) return;
+    // Если счётчик 0 — это первый набор сообщений после загрузки, просто запоминаем длину.
+    if (prevMessageCountRef.current === 0 && messages.length > 0) {
+      prevMessageCountRef.current = messages.length;
+    }
+  }, [loadingMessages, messages.length, currentGirl?.id]);
 
-  // Плавный скролл при каждом новом сообщении/typing ПОСЛЕ первоначального скролла
+  // Скролл только когда появилось НОВОЕ сообщение (длина выросла относительно запомненной).
   useEffect(() => {
-    if (!initialScrollDoneRef.current) return;
+    if (loadingMessages) return;
+    if (messages.length <= prevMessageCountRef.current) return;
+    prevMessageCountRef.current = messages.length;
     const el = messagesAreaRef.current;
     if (!el) return;
     el.style.scrollBehavior = 'smooth';
     el.scrollTop = el.scrollHeight;
-    // Убираем smooth обратно после анимации чтобы не мешал следующему instant-скроллу
-    const t = setTimeout(() => { el.style.scrollBehavior = 'auto'; }, 400);
-    return () => clearTimeout(t);
-  }, [messages, isTyping]); // eslint-disable-line react-hooks/exhaustive-deps
+    const tm = setTimeout(() => { el.style.scrollBehavior = 'auto'; }, 400);
+    return () => clearTimeout(tm);
+  }, [messages.length, loadingMessages]);
+
+  // Typing-индикатор: скроллим к нему только если юзер уже внизу (не отрывать его от чтения выше).
+  useEffect(() => {
+    if (!isTyping) return;
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    if (!nearBottom) return;
+    el.style.scrollBehavior = 'smooth';
+    el.scrollTop = el.scrollHeight;
+    const tm = setTimeout(() => { el.style.scrollBehavior = 'auto'; }, 400);
+    return () => clearTimeout(tm);
+  }, [isTyping]);
 
   /* ── Close emoji picker on click outside ── */
   useEffect(() => {
