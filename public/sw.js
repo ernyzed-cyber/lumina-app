@@ -1,7 +1,6 @@
 // Lumina PWA Service Worker
-const CACHE_NAME = 'lumina-cache-v1';
-const STATIC_CACHE = 'lumina-static-v1';
-const API_CACHE = 'lumina-api-v1';
+const CACHE_NAME = 'lumina-cache-v2';
+const STATIC_CACHE = 'lumina-static-v2';
 
 // App shell files to cache on install
 const APP_SHELL = [
@@ -24,7 +23,7 @@ self.addEventListener('install', (event) => {
 
 // ─── Activate ───────────────────────────────────────────────────────
 self.addEventListener('activate', (event) => {
-  const CURRENT_CACHES = [CACHE_NAME, STATIC_CACHE, API_CACHE];
+  const CURRENT_CACHES = [CACHE_NAME, STATIC_CACHE];
 
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -62,10 +61,16 @@ self.addEventListener('fetch', (event) => {
       /\.(tsx?|jsx?)(\?.*)?$/.test(url.pathname))
   ) return;
 
-  // Network-first strategy for API calls (e.g. Supabase)
-  if (url.pathname.startsWith('/api') || url.hostname.includes('supabase')) {
-    event.respondWith(networkFirst(request, API_CACHE));
-    return;
+  // НИКОГДА не перехватывать Supabase и другие API-запросы — они должны идти
+  // напрямую через браузер с корректными auth-заголовками и без кэша SW.
+  // Иначе свежие сообщения/данные могут теряться за устаревшим кэшем.
+  if (
+    url.hostname.includes('supabase') ||
+    url.hostname.includes('supabase.co') ||
+    url.pathname.startsWith('/api') ||
+    url.pathname.startsWith('/functions/')
+  ) {
+    return; // пропускаем, браузер сам делает fetch
   }
 
   // Cache-first strategy for static assets (images, CSS, JS, fonts)
