@@ -352,6 +352,7 @@ export default function Chat() {
     let cancelled = false;
     async function load() {
       setLoadingMessages(true);
+      console.log('[Chat] loadMessages START', { userId: user!.id, girlId: currentGirl!.id });
       try {
         const { data, error } = await supabase
           .from('messages')
@@ -366,6 +367,13 @@ export default function Chat() {
           console.error('[Chat] loadMessages error:', error);
           return;
         }
+
+        console.log('[Chat] loadMessages RESULT', {
+          count: data?.length ?? 0,
+          first: data?.[0]?.created_at,
+          last: data?.[data.length - 1]?.created_at,
+          cancelled,
+        });
 
         if (!cancelled && data) {
           setMessages(
@@ -405,8 +413,10 @@ export default function Chat() {
     if (loadingMessages) return;
     if (initialScrollDoneRef.current) return;
     initialScrollDoneRef.current = true;
-    if (!messagesAreaRef.current) return;
-    messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
+    // Автоскролл в конец при первом открытии отключён временно для диагностики:
+    // оставляем позицию наверху чтобы визуально было понятно загрузились ли новые сообщения.
+    // if (!messagesAreaRef.current) return;
+    // messagesAreaRef.current.scrollTop = messagesAreaRef.current.scrollHeight;
   }, [loadingMessages]);
 
   // Плавный скролл при каждом новом сообщении/typing ПОСЛЕ первоначального скролла
