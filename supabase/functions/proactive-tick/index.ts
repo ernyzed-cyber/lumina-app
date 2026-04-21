@@ -28,6 +28,9 @@ const GROK_MODEL = 'grok-4-1-fast-reasoning';
 const ROLL_INTERVAL_HOURS = 6;
 const SILENCE_HOURS_THRESHOLD = 6;
 const MORNING_SINCE_USER_MIN_MINUTES = 30;
+// Если её последнее сообщение висит без ответа ≥ этого числа часов — она перестаёт инициировать.
+// Гордость/самоуважение: не добиваемся того, кто игнорит.
+const GHOSTED_HOURS_THRESHOLD = 24;
 const MAX_PAIRS_PER_TICK = 50; // страховка от перегрузки
 
 // Вероятности случайного ролла по режимам дня.
@@ -310,6 +313,20 @@ async function processPair(
   const hoursSinceOwn = lastOwn ? (now - lastOwn) / 3600_000 : null;
 
   console.log(`[proactive-tick] pair ${pair.user_id.slice(0,8)}/${pair.girl_id} | lastUser=${pair.last_user_message_at} (${minsSinceUser}min ago) | lastOwn=${pair.last_assistant_message_at} (${hoursSinceOwn?.toFixed(1)}h ago) | lastUser>lastOwn=${lastUser > lastOwn}`);
+
+  // Gate: если юзер молчит > GHOSTED_HOURS после её последнего сообщения — она отпускает.
+  // Перестаёт инициировать вообще, пока юзер не напишет первым.
+  if (lastOwn > 0 && lastOwn >= lastUser && now - lastUser >= GHOSTED_HOURS_THRESHOLD * 3600_000) {
+    const hoursSilent = lastUser > 0 ? (now - lastUser) / 3600_000 : null;
+    console.log(`[proactive-tick] → user_ghosted (silent for ${hoursSilent?.toFixed(1)}h), skipping all triggers`);
+    await supabase.from('user_girl_state').upsert({
+      user_id: pair.user_id,
+      girl_id: pair.girl_id,
+      proactive_roll_at: new Date(now + ROLL_INTERVAL_HOURS * 3600_000).toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id,girl_id' });
+    return { ...baseResult, trigger: null, sent: false, reason: 'user_ghosted' };
+  }
 
   let trigger: Trigger | null = null;
   let hoursSinceLastOwn: number | undefined;
