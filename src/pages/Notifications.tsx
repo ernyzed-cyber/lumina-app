@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -161,20 +161,34 @@ export default function Notifications() {
   const { markLocalRead, markAllLocalRead, markManyLocalRead, markManyLocalDeleted, readIds, deletedIds, refresh } = useNotifications();
   const navigate = useNavigate();
 
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [loadingData, setLoadingData] = useState(true);
+  /**
+   * "Сырой" список: либо из БД, либо из demo. Без учёта readIds/deletedIds — они применяются в derived-мемо ниже.
+   * Используем sentinel-поле `_rawReadFromSource`, чтобы не путать с локальным read через readIds.
+   */
+  type RawNotification = Omit<Notification, 'text' | 'read'> & {
+    textKey?: string;     // для demo: ключ перевода (t() применяется в useMemo)
+    textRaw?: string;     // для БД: готовый текст
+    sourceRead: boolean;  // исходный флаг из БД (для demo всегда false — чтобы readIds решал)
+  };
 
-  /* ── Построить демо-уведомления с переведённым текстом и учётом readIds / deletedIds ── */
-  const buildDemoNotifications = useCallback((): Notification[] => {
-    return DEMO_NOTIFICATIONS_DATA
-      .filter((d) => !deletedIds.has(d.id))   // удалённые не показываем
-      .map((d) => ({
-        ...d,
-        text: t(DEMO_ACTION_KEYS[d.type]),
-        // Если id в readIds — считаем прочитанным (persisted)
-        read: d.read || readIds.has(d.id),
-      }));
-  }, [t, readIds, deletedIds]);
+  const [rawNotifications, setRawNotifications] = useState<RawNotification[]>([]);
+  const [loadingData, setLoadingData] = useState(true);
+  /** Флаг: "юзер только что очистил" — блокирует fallback на demo до следующей перезагрузки страницы */
+  const [justCleared, setJustCleared] = useState(false);
+
+  /* ── Построить сырые demo-данные (БЕЗ учёта read/deleted — применится в useMemo ниже) ── */
+  const buildRawDemoNotifications = useCallback((): RawNotification[] => {
+    return DEMO_NOTIFICATIONS_DATA.map((d) => ({
+      id: d.id,
+      type: d.type,
+      avatar: d.avatar,
+      name: d.name,
+      time: d.time,
+      girl_id: d.girl_id,
+      textKey: DEMO_ACTION_KEYS[d.type],
+      sourceRead: d.read,
+    }));
+  }, []);
 
   /* ── Auth guard ── */
   useEffect(() => {
@@ -183,7 +197,7 @@ export default function Notifications() {
     }
   }, [user, authLoading, navigate]);
 
-  /* ── Загрузка уведомлений ── */
+  /* ── Загрузка уведомлений (один раз на user) ── */
   useEffect(() => {
     if (!user) return;
 
@@ -199,42 +213,51 @@ export default function Notifications() {
           .order('created_at', { ascending: false })
           .limit(50);
 
-        if (!cancelled && data && !error && data.length > 0) {
-          setNotifications(
-            data.map(
-              (row: {
-                id: string;
-                type: string;
-                created_at: string;
-                is_read: boolean;
-                data?: {
-                  avatar?: string;
-                  name?: string;
-                  text?: string;
-                  girl_id?: string;
-                };
-              }) => {
-                const d = row.data ?? {};
-                return {
-                  id: row.id,
-                  type: row.type as NotificationType,
-                  avatar: d.avatar ?? '',
-                  name: d.name ?? '',
-                  text: d.text ?? '',
-                  time: row.created_at,
-                  read: row.is_read,
-                  girl_id: d.girl_id,
-                };
-              },
-            ),
+        if (cancelled) return;
+
+        if (data && !error && data.length > 0) {
+          const mapped: RawNotification[] = data.map(
+            (row: {
+              id: string;
+              type: string;
+              created_at: string;
+              is_read: boolean;
+              data?: {
+                avatar?: string;
+                name?: string;
+                text?: string;
+                girl_id?: string;
+              };
+            }) => {
+              const d = row.data ?? {};
+              return {
+                id: row.id,
+                type: row.type as NotificationType,
+                avatar: d.avatar ?? '',
+                name: d.name ?? '',
+                time: row.created_at,
+                girl_id: d.girl_id,
+                textRaw: d.text ?? '',
+                sourceRead: row.is_read,
+              };
+            },
           );
-        } else if (!cancelled) {
-          // Fallback на демо-данные
-          setNotifications(buildDemoNotifications());
+          setRawNotifications(mapped);
+        } else {
+          // Fallback на демо-данные — но только если юзер НЕ только что очистил
+          if (justCleared) {
+            setRawNotifications([]);
+          } else {
+            setRawNotifications(buildRawDemoNotifications());
+          }
         }
       } catch {
         if (!cancelled) {
-          setNotifications(buildDemoNotifications());
+          if (justCleared) {
+            setRawNotifications([]);
+          } else {
+            setRawNotifications(buildRawDemoNotifications());
+          }
         }
       } finally {
         if (!cancelled) setLoadingData(false);
@@ -244,16 +267,33 @@ export default function Notifications() {
     return () => {
       cancelled = true;
     };
-  }, [user, buildDemoNotifications]);
+    // Зависит ТОЛЬКО от user — чтобы list не перезагружался при изменении readIds/deletedIds.
+    // buildRawDemoNotifications стабильна (пустой deps), justCleared читается по snapshot (ok).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user]);
+
+  /* ── Derived: применяем t(), readIds, deletedIds к raw-списку ── */
+  const notifications = useMemo<Notification[]>(() => {
+    return rawNotifications
+      .filter((r) => !deletedIds.has(r.id))
+      .map((r) => ({
+        id: r.id,
+        type: r.type,
+        avatar: r.avatar,
+        name: r.name,
+        time: r.time,
+        girl_id: r.girl_id,
+        text: r.textRaw ?? (r.textKey ? t(r.textKey) : ''),
+        read: r.sourceRead || readIds.has(r.id),
+      }));
+  }, [rawNotifications, readIds, deletedIds, t]);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
   /* ── Пометить одно как прочитанное ── */
   const markAsRead = useCallback(
     async (id: string) => {
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n)),
-      );
+      // derived notifications пересчитается из readIds автоматически
       markLocalRead(id);
 
       if (user) {
@@ -274,9 +314,7 @@ export default function Notifications() {
 
   /* ── Пометить все как прочитанные ── */
   const markAllRead = useCallback(async () => {
-    // Persist всех текущих непрочитанных demo id в localStorage
     const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     markManyLocalRead(unreadIds);
     markAllLocalRead();
     showToast(t('notifications.toast.allRead'), 'success');
@@ -297,8 +335,12 @@ export default function Notifications() {
   /* ── Очистить все ── */
   const clearAll = useCallback(async () => {
     const allIds = notifications.map((n) => n.id);
-    setNotifications([]);
-    markManyLocalDeleted(allIds);   // persist — при F5 demo-данные будут отфильтрованы
+    // 1) Обнуляем raw-список (мгновенное визуальное исчезновение)
+    setRawNotifications([]);
+    // 2) Ставим флаг — чтобы при каком-либо будущем re-fetch не подтянулись демо снова
+    setJustCleared(true);
+    // 3) Persist deleted IDs — чтобы после F5 demo-данные отфильтровались
+    markManyLocalDeleted(allIds);
     markAllLocalRead();
     showToast(t('notifications.toast.cleared'), 'success');
 

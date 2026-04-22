@@ -374,11 +374,14 @@ export default function Chat() {
     if (!el) return;
     function onScroll() {
       const dist = el!.scrollHeight - el!.scrollTop - el!.clientHeight;
-      setShowScrollBtn(dist > 300);
+      // Появляется раньше — при 120px от низа (было 300px)
+      setShowScrollBtn(dist > 120);
     }
+    // Триггерим один раз при маунте — если контент длинный и уже не у низа
+    onScroll();
     el.addEventListener('scroll', onScroll, { passive: true });
     return () => el.removeEventListener('scroll', onScroll);
-  }, []);
+  }, [messages.length]);
 
   /* ── Close emoji picker on click outside ── */  useEffect(() => {
     if (!emojiOpen) return;
