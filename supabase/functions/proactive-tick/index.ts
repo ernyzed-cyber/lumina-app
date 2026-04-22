@@ -31,6 +31,8 @@ const MORNING_SINCE_USER_MIN_MINUTES = 30;
 // Если её последнее сообщение висит без ответа ≥ этого числа часов — она перестаёт инициировать.
 // Гордость/самоуважение: не добиваемся того, кто игнорит.
 const GHOSTED_HOURS_THRESHOLD = 24;
+const MISSING_HIM_HOURS = 48;     // через 48ч без ответа от него — она начинает скучать
+const REAPER_WARNING_DAYS = 5;    // через 5 дней — предупреждение (реализуется через уведомление)
 const MAX_PAIRS_PER_TICK = 50; // страховка от перегрузки
 
 // Вероятности случайного ролла по режимам дня.
@@ -330,6 +332,21 @@ async function processPair(
 
   let trigger: Trigger | null = null;
   let hoursSinceLastOwn: number | undefined;
+
+  // Режим "скучает": юзер молчит 48ч–7дней.
+  // В этом режиме random off — только специальное "скучающее" сообщение раз в 24ч.
+  const hoursSinceUserMsg = lastUser > 0 ? (now - lastUser) / 3600_000 : null;
+  const isMissingHim = hoursSinceUserMsg !== null && hoursSinceUserMsg >= MISSING_HIM_HOURS;
+
+  if (isMissingHim && !trigger) {
+    const lastProactive = pair.last_proactive_at ? new Date(pair.last_proactive_at).getTime() : 0;
+    const hoursSinceLastProactive = (now - lastProactive) / 3600_000;
+    if (hoursSinceLastProactive >= 24) {
+      trigger = 'silence';
+      hoursSinceLastOwn = hoursSinceUserMsg;
+      console.log(`[proactive-tick] → trigger=missing_him (silent ${hoursSinceUserMsg.toFixed(1)}h)`);
+    }
+  }
 
   // 1. Morning
   if (lastUser > lastOwn && lastUser > 0 && now - lastUser >= MORNING_SINCE_USER_MIN_MINUTES * 60_000) {
