@@ -12,7 +12,9 @@ import {
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import PageTransition from '../components/layout/PageTransition';
+import EmptyState from '../components/ui/EmptyState';
 import { useAuth } from '../hooks/useAuth';
+import { useAssignment } from '../hooks/useAssignment';
 import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../hooks/useToast';
 import { useLanguage } from '../i18n';
@@ -155,19 +157,22 @@ export default function Notifications() {
   const { user, loading: authLoading } = useAuth();
   const { showToast, ToastContainer } = useToast();
   const { t } = useLanguage();
-  const { markLocalRead, markAllLocalRead, refresh } = useNotifications();
+  const { activeGirlId } = useAssignment();
+  const { markLocalRead, markAllLocalRead, markManyLocalRead, readIds, refresh } = useNotifications();
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  /* ── Построить демо-уведомления с переведённым текстом ── */
+  /* ── Построить демо-уведомления с переведённым текстом и учётом readIds ── */
   const buildDemoNotifications = useCallback((): Notification[] => {
     return DEMO_NOTIFICATIONS_DATA.map((d) => ({
       ...d,
       text: t(DEMO_ACTION_KEYS[d.type]),
+      // Если id в readIds — считаем прочитанным (persisted)
+      read: d.read || readIds.has(d.id),
     }));
-  }, [t]);
+  }, [t, readIds]);
 
   /* ── Auth guard ── */
   useEffect(() => {
@@ -267,7 +272,10 @@ export default function Notifications() {
 
   /* ── Пометить все как прочитанные ── */
   const markAllRead = useCallback(async () => {
+    // Persist всех текущих непрочитанных demo id в localStorage
+    const unreadIds = notifications.filter((n) => !n.read).map((n) => n.id);
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    markManyLocalRead(unreadIds);
     markAllLocalRead();
     showToast(t('notifications.toast.allRead'), 'success');
 
@@ -282,7 +290,7 @@ export default function Notifications() {
         // Тихий fallback
       }
     }
-  }, [user, showToast, t, markAllLocalRead, refresh]);
+  }, [user, showToast, t, markAllLocalRead, markManyLocalRead, notifications, refresh]);
 
   /* ── Очистить все ── */
   const clearAll = useCallback(async () => {
@@ -329,6 +337,26 @@ export default function Notifications() {
   }
 
   if (!user) return null;
+
+  /* ── No active girl → EmptyState with CTA to /feed ── */
+  if (!activeGirlId) {
+    return (
+      <PageTransition>
+        <div className={s.page}>
+          <Navbar />
+          <main className={s.main}>
+            <EmptyState
+              icon={<Bell size={56} strokeWidth={1.5} />}
+              title={t('notifications.noGirlTitle')}
+              description={t('notifications.noGirlText')}
+              ctaLabel={t('notifications.noGirlCta')}
+              ctaTo="/feed"
+            />
+          </main>
+        </div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>

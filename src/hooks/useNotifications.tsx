@@ -9,6 +9,7 @@ import {
 } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from './useAuth';
+import { useAssignment } from './useAssignment';
 
 /* ── Типы ── */
 export type NotificationType = 'like' | 'message' | 'view' | 'favorite';
@@ -28,8 +29,12 @@ interface NotificationsContextValue {
   unreadNotifications: number;
   unreadMessages: number;
   lastNotification: AppNotification | null;
-  /** Локально пометить уведомление прочитанным (без бэка). */
+  /** ID прочитанных уведомлений (персистится в localStorage). */
+  readIds: Set<string>;
+  /** Пометить уведомление прочитанным. */
   markLocalRead: (id: string) => void;
+  /** Пометить несколько прочитанными за раз. */
+  markManyLocalRead: (ids: string[]) => void;
   /** Пометить все локально прочитанными. */
   markAllLocalRead: () => void;
   /** Обнулить счётчик сообщений (например, при открытии чата). */
@@ -45,12 +50,13 @@ interface NotificationsContextValue {
 
 const NotificationsCtx = createContext<NotificationsContextValue | null>(null);
 
-const STORAGE_KEY = 'lumina_notifications_read';
+const READ_IDS_KEY = 'lumina_notifications_read';
+const MSG_LAST_READ_KEY = 'lumina_chat_last_read'; // { [girlId]: ISO }
 
-/* ── Хранение "прочитано" локально (для демо-режима без БД) ── */
+/* ── Хранение "прочитано" локально ── */
 function loadReadIds(): Set<string> {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
+    const raw = localStorage.getItem(READ_IDS_KEY);
     if (!raw) return new Set();
     const parsed = JSON.parse(raw) as string[];
     return new Set(parsed);
@@ -61,7 +67,25 @@ function loadReadIds(): Set<string> {
 
 function saveReadIds(ids: Set<string>) {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify([...ids]));
+    localStorage.setItem(READ_IDS_KEY, JSON.stringify([...ids]));
+  } catch {
+    // ignore
+  }
+}
+
+function loadLastReadMap(): Record<string, string> {
+  try {
+    const raw = localStorage.getItem(MSG_LAST_READ_KEY);
+    if (!raw) return {};
+    return JSON.parse(raw) as Record<string, string>;
+  } catch {
+    return {};
+  }
+}
+
+function saveLastReadMap(map: Record<string, string>) {
+  try {
+    localStorage.setItem(MSG_LAST_READ_KEY, JSON.stringify(map));
   } catch {
     // ignore
   }
@@ -69,13 +93,14 @@ function saveReadIds(ids: Set<string>) {
 
 export function NotificationsProvider({ children }: { children: React.ReactNode }) {
   const { user } = useAuth();
+  const { activeGirlId } = useAssignment();
 
   const [unreadNotifications, setUnreadNotifications] = useState(0);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const [lastNotification, setLastNotification] = useState<AppNotification | null>(null);
   const [currentBanner, setCurrentBanner] = useState<AppNotification | null>(null);
+  const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIds());
 
-  const readIdsRef = useRef<Set<string>>(loadReadIds());
   const bannerTimerRef = useRef<number | null>(null);
 
   /* ── Показать баннер с авто-скрытием ── */
@@ -92,19 +117,17 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     setCurrentBanner(null);
   }, []);
 
-  /* ── Обновить счётчики из Supabase ── */
+  /* ── Обновить счётчики ──
+     notifications: COUNT неё из notifications WHERE is_read=false МИНУС локально прочитанные (для демо-режима).
+     messages: COUNT из messages (role='assistant') с activeGirlId WHERE created_at > last_read_at. Без девушки — 0. */
   const refresh = useCallback(async () => {
     if (!user) {
-      // Demo fallback: показываем 2 непрочитанных уведомления, если юзер анонимный.
-      setUnreadNotifications(2);
-      setUnreadMessages(1);
+      setUnreadNotifications(0);
+      setUnreadMessages(0);
       return;
     }
 
     try {
-      // Запрашиваем только notifications.read — эта колонка точно есть.
-      // messages не запрашиваем через БД: колонки read/recipient_id могут отсутствовать.
-      // Счётчик сообщений ведём локально через realtime (см. подписку ниже).
       const notifRes = await supabase
         .from('notifications')
         .select('id', { count: 'exact', head: true })
@@ -115,11 +138,40 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
         setUnreadNotifications(notifRes.count ?? 0);
       }
     } catch {
-      // silent — сохраняем предыдущее значение
+      // silent
     }
-  }, [user]);
 
-  /* ── Первая загрузка + при смене user ── */
+    // Сообщения: только если есть активная девушка
+    if (!activeGirlId) {
+      setUnreadMessages(0);
+      return;
+    }
+
+    try {
+      const lastReadMap = loadLastReadMap();
+      const lastReadIso = lastReadMap[activeGirlId];
+
+      let query = supabase
+        .from('messages')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', user.id)
+        .eq('girl_id', activeGirlId)
+        .eq('role', 'assistant');
+
+      if (lastReadIso) {
+        query = query.gt('created_at', lastReadIso);
+      }
+
+      const msgRes = await query;
+      if (!msgRes.error) {
+        setUnreadMessages(msgRes.count ?? 0);
+      }
+    } catch {
+      // silent
+    }
+  }, [user, activeGirlId]);
+
+  /* ── Первая загрузка + при смене user / activeGirlId ── */
   useEffect(() => {
     refresh();
   }, [refresh]);
@@ -178,9 +230,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
           filter: `user_id=eq.${user.id}`,
         },
         (payload) => {
-          const row = payload.new as { role?: string };
-          // Считаем только входящие от ИИ, не исходящие от юзера
-          if (row.role === 'assistant') {
+          const row = payload.new as { role?: string; girl_id?: string };
+          // Считаем только входящие от ИИ активной девушки
+          if (row.role === 'assistant' && row.girl_id && row.girl_id === activeGirlId) {
             setUnreadMessages((c) => c + 1);
           }
         },
@@ -190,13 +242,35 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [user, pushBanner]);
+  }, [user, activeGirlId, pushBanner]);
 
-  /* ── Локальный mark read (для демо) ── */
+  /* ── Mark read ── */
   const markLocalRead = useCallback((id: string) => {
-    readIdsRef.current.add(id);
-    saveReadIds(readIdsRef.current);
+    setReadIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      saveReadIds(next);
+      return next;
+    });
     setUnreadNotifications((c) => Math.max(0, c - 1));
+  }, []);
+
+  const markManyLocalRead = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setReadIds((prev) => {
+      const next = new Set(prev);
+      let added = 0;
+      for (const id of ids) {
+        if (!next.has(id)) {
+          next.add(id);
+          added++;
+        }
+      }
+      if (added > 0) saveReadIds(next);
+      return next;
+    });
+    setUnreadNotifications((c) => Math.max(0, c - ids.length));
   }, []);
 
   const markAllLocalRead = useCallback(() => {
@@ -205,7 +279,13 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const resetMessages = useCallback(() => {
     setUnreadMessages(0);
-  }, []);
+    // Сохраняем timestamp последнего прочтения для активной девушки
+    if (activeGirlId) {
+      const map = loadLastReadMap();
+      map[activeGirlId] = new Date().toISOString();
+      saveLastReadMap(map);
+    }
+  }, [activeGirlId]);
 
   const value = useMemo<NotificationsContextValue>(
     () => ({
@@ -213,7 +293,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       unreadMessages,
       lastNotification,
       currentBanner,
+      readIds,
       markLocalRead,
+      markManyLocalRead,
       markAllLocalRead,
       resetMessages,
       refresh,
@@ -225,7 +307,9 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       unreadMessages,
       lastNotification,
       currentBanner,
+      readIds,
       markLocalRead,
+      markManyLocalRead,
       markAllLocalRead,
       resetMessages,
       refresh,

@@ -20,6 +20,7 @@ import { Avatar } from '../components/ui/Avatar';
 import { Button } from '../components/ui/Button';
 import PageTransition from '../components/layout/PageTransition';
 import Navbar from '../components/layout/Navbar';
+import EmptyState from '../components/ui/EmptyState';
 import { Paywall } from '../components/Paywall';
 import GirlProfileDrawer, { type GirlProfileLabels } from '../components/GirlProfile/GirlProfileDrawer';
 import { useLanguage } from '../i18n';
@@ -238,12 +239,7 @@ export default function Chat() {
   }, [resetMessages]);
 
   /* ── Select girl from assignment ── */
-  // Redirect если нет активного assignment → идём на /feed
-  useEffect(() => {
-    if (!assignmentLoading && !activeGirlId) {
-      navigate('/feed', { replace: true });
-    }
-  }, [activeGirlId, assignmentLoading, navigate]);
+  // Если нет активного assignment → показываем EmptyState (см. ниже в return), НЕ редиректим
 
   // Установить currentGirl из activeGirlId
   useEffect(() => {
@@ -645,6 +641,24 @@ export default function Chat() {
   }
 
   if (!user) return null;
+
+  /* ── No active girl → EmptyState with CTA to /feed ── */
+  if (!activeGirlId) {
+    return (
+      <PageTransition>
+        <Navbar />
+        <div className={s.chatPage}>
+          <EmptyState
+            icon={<MessageCircleHeart size={56} strokeWidth={1.5} />}
+            title={t('chat.noGirlTitle')}
+            description={t('chat.noGirlText')}
+            ctaLabel={t('chat.noGirlCta')}
+            ctaTo="/feed"
+          />
+        </div>
+      </PageTransition>
+    );
+  }
 
   return (
     <PageTransition>
