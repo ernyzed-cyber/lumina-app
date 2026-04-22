@@ -20,6 +20,7 @@ import { Paywall } from '../components/Paywall';
 import FilterPanel from '../components/filters/FilterPanel';
 import GirlProfileDrawer, { type GirlProfileLabels } from '../components/GirlProfile/GirlProfileDrawer';
 import { useAuth } from '../hooks/useAuth';
+import { useAssignment } from '../hooks/useAssignment';
 import { useTelegramVerified } from '../hooks/useTelegramVerified';
 import { useLanguage } from '../i18n';
 import { getLocalizedGirls, type Girl } from '../data/girls';
@@ -293,8 +294,33 @@ export default function Feed() {
   const { t, lang } = useLanguage();
   const shouldReduceMotion = useReducedMotion();
 
+  /* ── Assignment ── */
+  const { activeGirlId, loading: assignmentLoading, createAssignment, isOnWaitlist, joinWaitlist } = useAssignment();
+
+  /* Redirect если уже есть девушка */
+  useEffect(() => {
+    if (!assignmentLoading && activeGirlId) {
+      navigate('/chat', { replace: true });
+    }
+  }, [activeGirlId, assignmentLoading, navigate]);
+
   /* ── Localized girls data ── */
   const allGirls = useMemo(() => getLocalizedGirls(lang), [lang]);
+
+  /* ── Taken girls (already assigned to someone) ── */
+  const [takenGirlIds, setTakenGirlIds] = useState<Set<string>>(new Set());
+  const [takenLoading, setTakenLoading] = useState(true);
+
+  useEffect(() => {
+    (async () => {
+      const { data } = await supabase
+        .from('assignments')
+        .select('girl_id')
+        .is('released_at', null);
+      setTakenGirlIds(new Set((data ?? []).map((r: { girl_id: string }) => r.girl_id)));
+      setTakenLoading(false);
+    })();
+  }, []);
 
   /* ── Filters ── */
   const [filters, setFilters] = useState<FilterState>(() =>
@@ -302,7 +328,10 @@ export default function Feed() {
   );
   const [filterOpen, setFilterOpen] = useState(false);
 
-  const girls = useMemo(() => allGirls.filter(g => matchesFilters(g, filters)), [allGirls, filters]);
+  const girls = useMemo(
+    () => allGirls.filter(g => matchesFilters(g, filters) && !takenGirlIds.has(g.id)),
+    [allGirls, filters, takenGirlIds],
+  );
 
   /* ── Persist filters ── */
   useEffect(() => {
@@ -391,25 +420,9 @@ export default function Feed() {
   const likesLeft = DAILY_LIKE_LIMIT - limits.likes;
   const superLikesLeft = DAILY_SUPERLIKE_LIMIT - limits.superLikes;
 
-  /* ── Sync like to Supabase ── */
-  const syncLike = useCallback(
-    (girlId: string) => {
-      if (!user) return;
-      setLikedIds((prev) => {
-        if (prev.includes(girlId)) return prev;
-        return [...prev, girlId];
-      });
-      supabase
-        .from('likes')
-        .upsert({ user_id: user.id, girl_id: girlId })
-        .then(() => {});
-    },
-    [user],
-  );
-
   /* ── Handle swipe ── */
   const handleSwipe = useCallback(
-    (dir: 'left' | 'right' | 'up') => {
+    async (dir: 'left' | 'right' | 'up') => {
       const girl = girls[currentIndex];
       if (!girl) return;
 
@@ -424,10 +437,21 @@ export default function Feed() {
           return;
         }
         setLimits((prev) => ({ ...prev, likes: prev.likes + 1 }));
-        syncLike(girl.id);
 
-        const delay = MATCH_DELAY_MIN + Math.random() * (MATCH_DELAY_MAX - MATCH_DELAY_MIN);
-        setTimeout(() => setMatchGirl(girl), delay);
+        // Создаём assignment вместо syncLike
+        const { error: aError } = await createAssignment(girl.id);
+        if (aError === 'girl_taken') {
+          // Девушку только что забрал другой юзер — просто убираем карточку
+          setCurrentIndex((prev) => prev + 1);
+          return;
+        }
+        if (!aError) {
+          // Успешно! Показываем match-анимацию, потом редиректим
+          const delay = MATCH_DELAY_MIN + Math.random() * (MATCH_DELAY_MAX - MATCH_DELAY_MIN);
+          setTimeout(() => {
+            setMatchGirl(girl);
+          }, delay);
+        }
       }
 
       if (dir === 'up') {
@@ -436,14 +460,21 @@ export default function Feed() {
           return;
         }
         setLimits((prev) => ({ ...prev, superLikes: prev.superLikes + 1 }));
-        syncLike(girl.id);
 
-        setTimeout(() => setMatchGirl(girl), 1500);
+        // Создаём assignment (superlike тоже выбирает девушку)
+        const { error: aError } = await createAssignment(girl.id);
+        if (aError === 'girl_taken') {
+          setCurrentIndex((prev) => prev + 1);
+          return;
+        }
+        if (!aError) {
+          setTimeout(() => setMatchGirl(girl), 1500);
+        }
       }
 
       setCurrentIndex((prev) => prev + 1);
     },
-    [currentIndex, likesLeft, superLikesLeft, syncLike, girls, telegramVerified],
+    [currentIndex, likesLeft, superLikesLeft, createAssignment, girls, telegramVerified],
   );
 
   /* ── Reset deck ── */
@@ -453,10 +484,8 @@ export default function Feed() {
 
   /* ── Close match overlay ── */
   function closeMatch() {
-    if (matchGirl) {
-      navigate(`/chat?girl=${matchGirl.id}`);
-    }
     setMatchGirl(null);
+    navigate('/chat', { replace: true });
   }
 
   /* ── Filter panel labels ── */
@@ -608,7 +637,7 @@ export default function Feed() {
   }), [t]);
 
   /* ── Loading state ── */
-  if (authLoading) {
+  if (authLoading || assignmentLoading || takenLoading) {
     return (
       <div className={s.page}>
         <Navbar />
@@ -649,7 +678,20 @@ export default function Feed() {
 
               {/* ── Card Stack ── */}
               <div className={s.cardStack}>
-                {isOutOfCards ? (
+                {allGirls.filter(g => matchesFilters(g, filters) && !takenGirlIds.has(g.id)).length === 0 && takenGirlIds.size > 0 ? (
+                  <div className={s.emptyStack}>
+                    <div className={s.emptyIcon}>
+                      <Heart size={48} strokeWidth={1.5} />
+                    </div>
+                    <h3 className={s.emptyTitle}>Все девушки заняты</h3>
+                    <p className={s.emptyText}>
+                      Как только кто-то освободится — мы тебе сообщим.
+                    </p>
+                    <button className={s.resetBtn} onClick={isOnWaitlist ? undefined : joinWaitlist} disabled={isOnWaitlist}>
+                      {isOnWaitlist ? 'Ты уже в очереди' : 'Встать в очередь'}
+                    </button>
+                  </div>
+                ) : isOutOfCards ? (
                   <div className={s.emptyStack}>
                     <div className={s.emptyIcon}>
                       <Heart size={48} strokeWidth={1.5} />
@@ -701,9 +743,15 @@ export default function Feed() {
                 <div className={s.actionButtons}>
                   <motion.button
                     className={`${s.actionBtn} ${s.actionBtnChat}`}
-                    onClick={() => {
+                    onClick={async () => {
                       const girl = girls[currentIndex];
-                      if (girl) navigate(`/chat?girl=${girl.id}`);
+                      if (!girl) return;
+                      if (telegramVerified === false) return;
+                      if (likesLeft <= 0) { setPaywallType('likes'); return; }
+                      setLimits((prev) => ({ ...prev, likes: prev.likes + 1 }));
+                      const { error: aError } = await createAssignment(girl.id);
+                      if (!aError) navigate('/chat', { replace: true });
+                      else if (aError === 'girl_taken') setCurrentIndex((prev) => prev + 1);
                     }}
                     aria-label={t('feed.sendMessage')}
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.85 }}
@@ -838,11 +886,11 @@ export default function Feed() {
           girl={selectedGirl}
           onClose={closeDrawer}
           t={drawerLabels}
-          onChat={(g) => {
+          onChat={(_g) => {
+            // В концепции 1:1 кнопка "написать" в drawer тоже создаёт assignment
             closeDrawer();
-            navigate(`/chat?girl=${g.id}`);
           }}
-          onLike={(g) => {
+          onLike={async (g) => {
             if (telegramVerified === false) {
               closeDrawer();
               setVerifyModalOpen(true);
@@ -854,12 +902,14 @@ export default function Feed() {
               return;
             }
             setLimits((prev) => ({ ...prev, likes: prev.likes + 1 }));
-            syncLike(g.id);
+            const { error: aError } = await createAssignment(g.id);
             closeDrawer();
-            const delay = MATCH_DELAY_MIN + Math.random() * (MATCH_DELAY_MAX - MATCH_DELAY_MIN);
-            setTimeout(() => setMatchGirl(g), delay);
+            if (!aError) {
+              const delay = MATCH_DELAY_MIN + Math.random() * (MATCH_DELAY_MAX - MATCH_DELAY_MIN);
+              setTimeout(() => setMatchGirl(g), delay);
+            }
           }}
-          onSuperLike={(g) => {
+          onSuperLike={async (g) => {
             if (telegramVerified === false) {
               closeDrawer();
               setVerifyModalOpen(true);
@@ -871,9 +921,11 @@ export default function Feed() {
               return;
             }
             setLimits((prev) => ({ ...prev, superLikes: prev.superLikes + 1 }));
-            syncLike(g.id);
+            const { error: aError } = await createAssignment(g.id);
             closeDrawer();
-            setTimeout(() => setMatchGirl(g), 1500);
+            if (!aError) {
+              setTimeout(() => setMatchGirl(g), 1500);
+            }
           }}
         />
       </div>

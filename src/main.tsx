@@ -6,6 +6,7 @@ import { ThemeProvider } from './hooks/useTheme';
 import { NotificationsProvider } from './hooks/useNotifications';
 import { MyProfileProvider } from './hooks/useMyProfile';
 import { LanguageProvider } from './i18n';
+import { AssignmentProvider } from './hooks/useAssignment';
 import App from './App';
 import './styles/global.css';
 
@@ -15,11 +16,13 @@ createRoot(document.getElementById('root')!).render(
       <ThemeProvider>
         <LanguageProvider>
           <AuthProvider>
-            <MyProfileProvider>
-              <NotificationsProvider>
-                <App />
-              </NotificationsProvider>
-            </MyProfileProvider>
+            <AssignmentProvider>
+              <MyProfileProvider>
+                <NotificationsProvider>
+                  <App />
+                </NotificationsProvider>
+              </MyProfileProvider>
+            </AssignmentProvider>
           </AuthProvider>
         </LanguageProvider>
       </ThemeProvider>

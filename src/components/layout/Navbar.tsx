@@ -12,6 +12,7 @@ import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
 import { useMyProfile } from '../../hooks/useMyProfile';
 import { useLanguage } from '../../i18n';
+import { useAssignment } from '../../hooks/useAssignment';
 import styles from './Navbar.module.css';
 
 interface NavItem {
@@ -42,9 +43,14 @@ export default function Navbar({
   const messagesBadge = unreadMessages ?? ctxMessages;
   const notificationsBadge = unreadNotifications ?? ctxNotifications;
 
+  const { activeGirlId } = useAssignment();
+
   const navItems: NavItem[] = [
-    { to: '/search', icon: <Search size={22} />, labelKey: 'navbar.search' },
-    { to: '/feed', icon: <Heart size={22} />, labelKey: 'navbar.feed' },
+    // Feed и Search показываем ТОЛЬКО если нет активного assignment
+    ...(!activeGirlId ? [
+      { to: '/search', icon: <Search size={22} />, labelKey: 'navbar.search' },
+      { to: '/feed',   icon: <Heart size={22} />,  labelKey: 'navbar.feed' },
+    ] : []),
     {
       to: '/chat',
       icon: <MessageCircle size={22} />,

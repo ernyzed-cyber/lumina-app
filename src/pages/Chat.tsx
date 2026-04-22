@@ -1,21 +1,18 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type KeyboardEvent, type ChangeEvent } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  Search,
   Info,
   Smile,
   Send,
-  Menu,
   MessageCircleHeart,
   ExternalLink,
   Gift,
-  Megaphone,
-  Star,
 } from 'lucide-react';
-import { getLocalizedGirls, getLocalizedGirlById, type Girl } from '../data/girls';
+import { getLocalizedGirlById, type Girl } from '../data/girls';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
+import { useAssignment } from '../hooks/useAssignment';
 import { supabase } from '../lib/supabase';
 import { storage } from '../utils/helpers';
 import { Avatar } from '../components/ui/Avatar';
@@ -35,13 +32,6 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
-}
-
-interface DialogPreview {
-  girl: Girl;
-  lastMessage: string;
-  time: string;
-  unread: number;
 }
 
 /* ── Constants ── */
@@ -119,12 +109,12 @@ export default function Chat() {
   const { t, tr, lang } = useLanguage();
   const { user, session, loading: authLoading } = useAuth();
   const { isVerified: telegramVerified } = useTelegramVerified();
-  const { resetMessages, unreadNotifications } = useNotifications();
+  const { resetMessages } = useNotifications();
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const { activeGirlId, loading: assignmentLoading } = useAssignment();
 
   /* ── Localized girls data ── */
-  const girls = useMemo(() => getLocalizedGirls(lang), [lang]);
+  // (Removed: in 1:1 model we only need the active girl, not the full list)
 
   /* ── GirlProfileDrawer labels ── */
   const drawerLabels: GirlProfileLabels = useMemo(() => ({
@@ -215,10 +205,7 @@ export default function Chat() {
   /** Динамический статус собеседницы: online пока идёт разговор, иначе offline ("была недавно"). */
   const [liveOnline, setLiveOnline] = useState(false);
   const [currentGirl, setCurrentGirl] = useState<Girl | null>(null);
-  const [dialogsOpen, setDialogsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
-  const [dialogs, setDialogs] = useState<DialogPreview[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
   const [loadingMessages, setLoadingMessages] = useState(false);
 
   const [msgLimits, setMsgLimits] = useState<MsgLimits>(loadMsgLimits);
@@ -248,102 +235,23 @@ export default function Chat() {
     resetMessages();
   }, [resetMessages]);
 
-  /* ── Select girl from URL ── */
+  /* ── Select girl from assignment ── */
+  // Redirect если нет активного assignment → идём на /feed
   useEffect(() => {
-    const girlId = searchParams.get('girl');
-    if (girlId) {
-      const found = getLocalizedGirlById(lang, girlId);
-      if (found) {
-        setCurrentGirl(found);
-        return;
-      }
+    if (!assignmentLoading && !activeGirlId) {
+      navigate('/feed', { replace: true });
     }
-    setCurrentGirl(girls[0]);
-  }, [searchParams, lang, girls]);
+  }, [activeGirlId, assignmentLoading, navigate]);
 
-
-
-  /* ── Load real dialog previews from Supabase ── */
+  // Установить currentGirl из activeGirlId
   useEffect(() => {
-    if (!user) return;
-
-    async function loadDialogs() {
-      const previews: DialogPreview[] = [];
-
-      for (const girl of girls) {
-        try {
-          const { data } = await supabase
-            .from('messages')
-            .select('content, created_at')
-            .eq('user_id', user!.id)
-            .eq('girl_id', girl.id)
-            .order('created_at', { ascending: false })
-            .limit(1);
-
-          if (data && data.length > 0) {
-            const lastMsg = data[0];
-            const d = new Date(lastMsg.created_at);
-            const now = new Date();
-            const diff = now.getTime() - d.getTime();
-            let timeStr: string;
-            if (diff < 60000) timeStr = 'now';
-            else if (diff < 3600000) timeStr = `${Math.floor(diff / 60000)}m`;
-            else if (diff < 86400000) timeStr = `${Math.floor(diff / 3600000)}h`;
-            else timeStr = `${Math.floor(diff / 86400000)}d`;
-
-            previews.push({
-              girl,
-              lastMessage: lastMsg.content.length > 50
-                ? lastMsg.content.slice(0, 50) + '...'
-                : lastMsg.content,
-              time: timeStr,
-              unread: 0,
-            });
-          } else {
-            previews.push({
-              girl,
-              lastMessage: t('chat.startChatting'),
-              time: '',
-              unread: 0,
-            });
-          }
-        } catch {
-          previews.push({
-            girl,
-            lastMessage: t('chat.startChatting'),
-            time: '',
-            unread: 0,
-          });
-        }
-      }
-
-      setDialogs(previews);
+    if (activeGirlId) {
+      const found = getLocalizedGirlById(lang, activeGirlId);
+      if (found) setCurrentGirl(found);
     }
+  }, [activeGirlId, lang]);
 
-    loadDialogs();
-  }, [user, girls, t]);
 
-  /* ── Обновить превью текущего диалога когда приходят новые сообщения ── */
-  useEffect(() => {
-    if (!currentGirl || messages.length === 0) return;
-    const last = messages[messages.length - 1];
-    const d = new Date(last.timestamp);
-    const now = new Date();
-    const diff = now.getTime() - d.getTime();
-    let timeStr: string;
-    if (diff < 60000) timeStr = 'now';
-    else if (diff < 3600000) timeStr = `${Math.floor(diff / 60000)}m`;
-    else if (diff < 86400000) timeStr = `${Math.floor(diff / 3600000)}h`;
-    else timeStr = `${Math.floor(diff / 86400000)}d`;
-    const preview = last.content.length > 50 ? last.content.slice(0, 50) + '...' : last.content;
-    setDialogs((prev) =>
-      prev.map((d) =>
-        d.girl.id === currentGirl.id
-          ? { ...d, lastMessage: preview, time: timeStr }
-          : d,
-      ),
-    );
-  }, [messages, currentGirl]);
 
   /* ── Load messages from Supabase ── */
   useEffect(() => {
@@ -560,15 +468,6 @@ export default function Chat() {
 
       saveMessage('user', content);
 
-      // Update dialog preview
-      setDialogs((prev) =>
-        prev.map((d) =>
-          d.girl.id === currentGirl.id
-            ? { ...d, lastMessage: content.length > 50 ? content.slice(0, 50) + '...' : content, time: 'now' }
-            : d,
-        ),
-      );
-
       // Статус будет управляться расписанием с сервера:
       // фаза "игнор" (offline) → "в сети" (online) → "печатает" (typing) → ответ.
       setIsTyping(false);
@@ -676,14 +575,7 @@ export default function Chat() {
         setTimeout(() => setLiveOnline(false), 90_000);
 
         const lastSeg = segments[segments.length - 1] ?? replyFull;
-        // Update dialog preview with last segment
-        setDialogs((prev) =>
-          prev.map((d) =>
-            d.girl.id === currentGirl.id
-              ? { ...d, lastMessage: lastSeg.length > 50 ? lastSeg.slice(0, 50) + '...' : lastSeg, time: 'now' }
-              : d,
-          ),
-        );
+        void lastSeg; // dialog preview removed in 1:1 model
       } catch (err) {
         console.error('[chat-ai] fallback triggered:', err);
         const fallbackReplies: string[] = tr.chat.fallbackReplies;
@@ -730,30 +622,8 @@ export default function Chat() {
     [sendMessage],
   );
 
-  /* ── Switch girl ── */
-  const switchGirl = useCallback(
-    (girl: Girl) => {
-      setCurrentGirl(girl);
-      setMessages([]);
-      setSearchParams({ girl: girl.id });
-      setDialogsOpen(false);
-    },
-    [setSearchParams],
-  );
-
-  /* ── Close side panels ── */
-  const closeOverlays = useCallback(() => {
-    setDialogsOpen(false);
-    setProfileOpen(false);
-  }, []);
-
-  /* ── Filter dialogs ── */
-  const filteredDialogs = searchQuery
-    ? dialogs.filter((d) => d.girl.name.toLowerCase().includes(searchQuery.toLowerCase()))
-    : dialogs;
-
   /* ── Loading ── */
-  if (authLoading) {
+  if (authLoading || assignmentLoading) {
     return (
       <div className={s.loadingPage}>
         <div className={s.loadingSpinner} />
@@ -769,114 +639,17 @@ export default function Chat() {
     <div className={s.chatPage}>
       {/* ════════ Mobile overlay ════════ */}
       <div
-        className={`${s.overlay} ${dialogsOpen || profileOpen ? s.overlayVisible : ''}`}
-        onClick={closeOverlays}
+        className={`${s.overlay} ${profileOpen ? s.overlayVisible : ''}`}
+        onClick={() => setProfileOpen(false)}
       />
 
-      {/* ════════ LEFT PANEL — Dialogs ════════ */}
-      <aside className={`${s.dialogPanel} ${dialogsOpen ? s.dialogPanelOpen : ''}`}>
-        <div className={s.dialogHeader}>
-          <h2 className={s.dialogTitle}>{t('chat.dialogTitle')}</h2>
-          <div className={s.searchBox}>
-            <Search className={s.searchIcon} />
-            <input
-              className={s.searchInput}
-              type="text"
-              placeholder={t('chat.searchPlaceholder')}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              aria-label={t('chat.searchAriaLabel')}
-            />
-          </div>
-        </div>
-
-        <div className={s.dialogList} role="listbox" aria-label={t('chat.chatListAriaLabel')}>
-          {/* ── Системный канал «Оповещения» ── */}
-          <div
-            className={s.dialogRow}
-            onClick={() => navigate('/notifications')}
-            role="option"
-            aria-selected={false}
-            tabIndex={0}
-            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); navigate('/notifications'); } }}
-          >
-            <div className={s.notificationAvatar}>
-              <Megaphone size={22} />
-            </div>
-            <div className={s.dialogInfo}>
-              <div className={s.dialogTop}>
-                <span className={s.dialogName}>
-                  {t('chat.notificationsName')}
-                  <span className={s.nameOnlineDot} />
-                </span>
-                <span className={s.dialogTime} />
-              </div>
-              <div className={s.dialogBottom}>
-                <p className={s.dialogPreview}>{t('chat.notificationsPreview')}</p>
-                <div className={s.dialogBadges}>
-                  <Star size={14} className={s.starIcon} fill="currentColor" />
-                  {unreadNotifications > 0 && (
-                    <span className={s.unreadBadge}>{unreadNotifications}</span>
-                  )}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ── Обычные диалоги ── */}
-          {filteredDialogs.map((d) => {
-            // Онлайн-статус: только Алина имеет реальную persona в БД и динамический liveOnline.
-            // Остальные девушки пока офлайн до появления их personas.
-            const isActive = currentGirl?.id === d.girl.id;
-            const hasPersona = d.girl.id === 'alina';
-            const isOnline = hasPersona ? (isActive ? liveOnline : false) : false;
-            return (
-            <div
-              key={d.girl.id}
-              className={`${s.dialogRow} ${isActive ? s.dialogRowActive : ''}`}
-              onClick={() => switchGirl(d.girl)}
-              role="option"
-              aria-selected={isActive}
-              tabIndex={0}
-              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); switchGirl(d.girl); } }}
-            >
-              <Avatar src={d.girl.photo} alt={d.girl.name} size="sm" online={isOnline} />
-              <div className={s.dialogInfo}>
-                <div className={s.dialogTop}>
-                  <span className={s.dialogName}>
-                    {d.girl.name}
-                    {isOnline && <span className={s.nameOnlineDot} />}
-                  </span>
-                  {d.time && <span className={s.dialogTime}>{d.time}</span>}
-                </div>
-                <div className={s.dialogBottom}>
-                  <p className={s.dialogPreview}>{d.lastMessage}</p>
-                  {d.unread > 0 && (
-                    <div className={s.dialogBadges}>
-                      <span className={s.unreadBadge}>{d.unread}</span>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-            );
-          })}
-        </div>
-      </aside>
+      {/* Левая панель удалена — в концепции 1:1 нет списка чатов */}
 
       {/* ════════ CENTER — Chat ════════ */}
       <main className={s.chatPanel} id="main-content">
         {/* ── Header ── */}
         {currentGirl && (
           <div className={s.chatHeader}>
-            <button
-              className={`${s.headerBtn} ${s.menuBtn}`}
-              onClick={() => setDialogsOpen(true)}
-              aria-label={t('chat.openChatsAriaLabel')}
-            >
-              <Menu size={20} />
-            </button>
-
             <button
               type="button"
               className={s.headerAvatarBtn}

@@ -17,6 +17,8 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
 const Premium = lazy(() => import('./pages/Premium'));
+const Waitlist = lazy(() => import('./pages/Waitlist'));
+const Released = lazy(() => import('./pages/Released'));
 
 /* ── Фоллбэк при загрузке чанка ── */
 function PageLoader() {
@@ -70,6 +72,8 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/premium" element={<Premium />} />
+          <Route path="/waitlist" element={<Waitlist />} />
+          <Route path="/released" element={<Released />} />
         </Route>
       </Routes>
     </Suspense>
