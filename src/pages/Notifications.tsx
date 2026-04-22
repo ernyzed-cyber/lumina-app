@@ -158,21 +158,23 @@ export default function Notifications() {
   const { showToast, ToastContainer } = useToast();
   const { t } = useLanguage();
   const { activeGirlId } = useAssignment();
-  const { markLocalRead, markAllLocalRead, markManyLocalRead, readIds, refresh } = useNotifications();
+  const { markLocalRead, markAllLocalRead, markManyLocalRead, markManyLocalDeleted, readIds, deletedIds, refresh } = useNotifications();
   const navigate = useNavigate();
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loadingData, setLoadingData] = useState(true);
 
-  /* ── Построить демо-уведомления с переведённым текстом и учётом readIds ── */
+  /* ── Построить демо-уведомления с переведённым текстом и учётом readIds / deletedIds ── */
   const buildDemoNotifications = useCallback((): Notification[] => {
-    return DEMO_NOTIFICATIONS_DATA.map((d) => ({
-      ...d,
-      text: t(DEMO_ACTION_KEYS[d.type]),
-      // Если id в readIds — считаем прочитанным (persisted)
-      read: d.read || readIds.has(d.id),
-    }));
-  }, [t, readIds]);
+    return DEMO_NOTIFICATIONS_DATA
+      .filter((d) => !deletedIds.has(d.id))   // удалённые не показываем
+      .map((d) => ({
+        ...d,
+        text: t(DEMO_ACTION_KEYS[d.type]),
+        // Если id в readIds — считаем прочитанным (persisted)
+        read: d.read || readIds.has(d.id),
+      }));
+  }, [t, readIds, deletedIds]);
 
   /* ── Auth guard ── */
   useEffect(() => {
@@ -294,7 +296,9 @@ export default function Notifications() {
 
   /* ── Очистить все ── */
   const clearAll = useCallback(async () => {
+    const allIds = notifications.map((n) => n.id);
     setNotifications([]);
+    markManyLocalDeleted(allIds);   // persist — при F5 demo-данные будут отфильтрованы
     markAllLocalRead();
     showToast(t('notifications.toast.cleared'), 'success');
 
@@ -309,7 +313,7 @@ export default function Notifications() {
         // Тихий fallback
       }
     }
-  }, [user, showToast, t, markAllLocalRead, refresh]);
+  }, [user, showToast, t, markAllLocalRead, markManyLocalDeleted, notifications, refresh]);
 
   /* ── Клик по уведомлению ── */
   const handleItemClick = useCallback(

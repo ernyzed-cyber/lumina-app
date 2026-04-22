@@ -31,12 +31,18 @@ interface NotificationsContextValue {
   lastNotification: AppNotification | null;
   /** ID прочитанных уведомлений (персистится в localStorage). */
   readIds: Set<string>;
+  /** ID удалённых уведомлений (персистится в localStorage). */
+  deletedIds: Set<string>;
   /** Пометить уведомление прочитанным. */
   markLocalRead: (id: string) => void;
   /** Пометить несколько прочитанными за раз. */
   markManyLocalRead: (ids: string[]) => void;
   /** Пометить все локально прочитанными. */
   markAllLocalRead: () => void;
+  /** Пометить одно уведомление удалённым (persist). */
+  markLocalDeleted: (id: string) => void;
+  /** Пометить несколько удалёнными за раз (persist). */
+  markManyLocalDeleted: (ids: string[]) => void;
   /** Обнулить счётчик сообщений (например, при открытии чата). */
   resetMessages: () => void;
   /** Ручное обновление счётчиков из базы. */
@@ -51,6 +57,7 @@ interface NotificationsContextValue {
 const NotificationsCtx = createContext<NotificationsContextValue | null>(null);
 
 const READ_IDS_KEY = 'lumina_notifications_read';
+const DELETED_IDS_KEY = 'lumina_notifications_deleted';
 const MSG_LAST_READ_KEY = 'lumina_chat_last_read'; // { [girlId]: ISO }
 
 /* ── Хранение "прочитано" локально ── */
@@ -68,6 +75,26 @@ function loadReadIds(): Set<string> {
 function saveReadIds(ids: Set<string>) {
   try {
     localStorage.setItem(READ_IDS_KEY, JSON.stringify([...ids]));
+  } catch {
+    // ignore
+  }
+}
+
+/* ── Хранение "удалено" локально ── */
+function loadDeletedIds(): Set<string> {
+  try {
+    const raw = localStorage.getItem(DELETED_IDS_KEY);
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw) as string[];
+    return new Set(parsed);
+  } catch {
+    return new Set();
+  }
+}
+
+function saveDeletedIds(ids: Set<string>) {
+  try {
+    localStorage.setItem(DELETED_IDS_KEY, JSON.stringify([...ids]));
   } catch {
     // ignore
   }
@@ -100,6 +127,7 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
   const [lastNotification, setLastNotification] = useState<AppNotification | null>(null);
   const [currentBanner, setCurrentBanner] = useState<AppNotification | null>(null);
   const [readIds, setReadIds] = useState<Set<string>>(() => loadReadIds());
+  const [deletedIds, setDeletedIds] = useState<Set<string>>(() => loadDeletedIds());
 
   const bannerTimerRef = useRef<number | null>(null);
 
@@ -277,6 +305,29 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     setUnreadNotifications(0);
   }, []);
 
+  const markLocalDeleted = useCallback((id: string) => {
+    setDeletedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      saveDeletedIds(next);
+      return next;
+    });
+    // Удалённое = тоже больше не unread
+    setUnreadNotifications((c) => Math.max(0, c - 1));
+  }, []);
+
+  const markManyLocalDeleted = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setDeletedIds((prev) => {
+      const next = new Set(prev);
+      for (const id of ids) next.add(id);
+      saveDeletedIds(next);
+      return next;
+    });
+    setUnreadNotifications(0);
+  }, []);
+
   const resetMessages = useCallback(() => {
     setUnreadMessages(0);
     // Сохраняем timestamp последнего прочтения для активной девушки
@@ -294,9 +345,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       lastNotification,
       currentBanner,
       readIds,
+      deletedIds,
       markLocalRead,
       markManyLocalRead,
       markAllLocalRead,
+      markLocalDeleted,
+      markManyLocalDeleted,
       resetMessages,
       refresh,
       pushBanner,
@@ -308,9 +362,12 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
       lastNotification,
       currentBanner,
       readIds,
+      deletedIds,
       markLocalRead,
       markManyLocalRead,
       markAllLocalRead,
+      markLocalDeleted,
+      markManyLocalDeleted,
       resetMessages,
       refresh,
       pushBanner,
