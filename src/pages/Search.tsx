@@ -5,6 +5,7 @@ import PageTransition from '../components/layout/PageTransition';
 import FilterPanel from '../components/filters/FilterPanel';
 import GirlProfileDrawer, { type GirlProfileLabels } from '../components/GirlProfile/GirlProfileDrawer';
 import { useAuth } from '../hooks/useAuth';
+import { useAssignment } from '../hooks/useAssignment';
 import { useLanguage } from '../i18n';
 import { getLocalizedGirls, type Girl } from '../data/girls';
 import type { FilterState } from '../types/filters';
@@ -44,6 +45,7 @@ type GridItem =
 
 export default function Search() {
   const { user, loading: authLoading } = useAuth();
+  const { activeGirlId, takenGirlIds, takenLoading } = useAssignment();
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
@@ -60,8 +62,13 @@ export default function Search() {
   }, [filters]);
 
   const girls = useMemo(
-    () => allGirls.filter((g) => matchesFilters(g, filters)),
-    [allGirls, filters],
+    () => allGirls.filter((g) => {
+      if (!matchesFilters(g, filters)) return false;
+      // Скрываем занятых девушек — кроме своей (если она занята мной)
+      if (takenGirlIds.has(g.id) && g.id !== activeGirlId) return false;
+      return true;
+    }),
+    [allGirls, filters, takenGirlIds, activeGirlId],
   );
 
   /* ── GirlProfileDrawer ── */
@@ -255,7 +262,7 @@ export default function Search() {
     bodyPlus: t('filters.bodyPlus'),
   }), [t]);
 
-  if (authLoading || !user) return null;
+  if (authLoading || !user || takenLoading) return null;
 
   return (
     <PageTransition>

@@ -18,6 +18,12 @@ interface AssignmentContext {
   startedAt: string | null;           // когда началось
   isOnWaitlist: boolean;              // юзер в очереди ожидания
   loading: boolean;
+  /** ID всех занятых девушек (включая мою). Единый источник истины для Feed/Search/etc. */
+  takenGirlIds: Set<string>;
+  /** Загружаются ли takenGirlIds */
+  takenLoading: boolean;
+  /** Перезагрузить список занятых девушек (напр. после создания assignment) */
+  refreshTakenGirls: () => Promise<void>;
   /** Создать assignment (вызвать после лайка на Feed) */
   createAssignment: (girlId: string) => Promise<{ error: string | null }>;
   /** Освободить assignment самостоятельно (кнопка "расстаться") */
@@ -35,6 +41,25 @@ export function AssignmentProvider({ children }: { children: React.ReactNode }) 
   const [assignment, setAssignment] = useState<AssignmentRow | null>(null);
   const [isOnWaitlist, setIsOnWaitlist] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [takenGirlIds, setTakenGirlIds] = useState<Set<string>>(new Set());
+  const [takenLoading, setTakenLoading] = useState(true);
+
+  // Загрузить список занятых девушек через SECURITY DEFINER функцию (обходит RLS).
+  const refreshTakenGirls = useCallback(async () => {
+    const { data, error } = await supabase.rpc('get_taken_girl_ids');
+    if (error) {
+      console.warn('[useAssignment] get_taken_girl_ids failed:', error.message);
+      setTakenGirlIds(new Set());
+    } else {
+      setTakenGirlIds(new Set((data ?? []).map((r: { girl_id: string }) => r.girl_id)));
+    }
+    setTakenLoading(false);
+  }, []);
+
+  // Первая загрузка takenGirls (не зависит от user — публично-читаемо)
+  useEffect(() => {
+    refreshTakenGirls();
+  }, [refreshTakenGirls]);
 
   // Загрузить текущий статус при монтировании и при смене юзера.
   useEffect(() => {
@@ -102,8 +127,10 @@ export function AssignmentProvider({ children }: { children: React.ReactNode }) 
 
     setAssignment(asgn ?? null);
     setIsOnWaitlist(false);
+    // Обновляем список занятых девушек (наша девушка теперь в занятых)
+    await refreshTakenGirls();
     return { error: null };
-  }, [user]);
+  }, [user, refreshTakenGirls]);
 
   const releaseAssignment = useCallback(async () => {
     if (!assignment || !user) return;
@@ -113,7 +140,9 @@ export function AssignmentProvider({ children }: { children: React.ReactNode }) 
       .eq('id', assignment.id);
 
     setAssignment(null);
-  }, [assignment, user]);
+    // Девушка снова свободна — обновляем список занятых
+    await refreshTakenGirls();
+  }, [assignment, user, refreshTakenGirls]);
 
   const joinWaitlist = useCallback(async () => {
     if (!user || isOnWaitlist) return;
@@ -134,6 +163,9 @@ export function AssignmentProvider({ children }: { children: React.ReactNode }) 
       startedAt: assignment?.started_at ?? null,
       isOnWaitlist,
       loading,
+      takenGirlIds,
+      takenLoading,
+      refreshTakenGirls,
       createAssignment,
       releaseAssignment,
       joinWaitlist,

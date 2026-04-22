@@ -294,8 +294,16 @@ export default function Feed() {
   const { t, lang } = useLanguage();
   const shouldReduceMotion = useReducedMotion();
 
-  /* ── Assignment ── */
-  const { activeGirlId, loading: assignmentLoading, createAssignment, isOnWaitlist, joinWaitlist } = useAssignment();
+  /* ── Assignment (единый источник истины: activeGirlId + takenGirlIds) ── */
+  const {
+    activeGirlId,
+    loading: assignmentLoading,
+    createAssignment,
+    isOnWaitlist,
+    joinWaitlist,
+    takenGirlIds,
+    takenLoading,
+  } = useAssignment();
 
   /* Redirect если уже есть девушка */
   useEffect(() => {
@@ -306,23 +314,6 @@ export default function Feed() {
 
   /* ── Localized girls data ── */
   const allGirls = useMemo(() => getLocalizedGirls(lang), [lang]);
-
-  /* ── Taken girls (already assigned to someone) ── */
-  const [takenGirlIds, setTakenGirlIds] = useState<Set<string>>(new Set());
-  const [takenLoading, setTakenLoading] = useState(true);
-
-  useEffect(() => {
-    (async () => {
-      // Используем SECURITY DEFINER функцию — обходит RLS на assignments,
-      // чтобы любой авторизованный пользователь видел занятых девушек.
-      const { data, error } = await supabase.rpc('get_taken_girl_ids');
-      if (error) {
-        console.warn('[Feed] get_taken_girl_ids failed:', error.message);
-      }
-      setTakenGirlIds(new Set((data ?? []).map((r: { girl_id: string }) => r.girl_id)));
-      setTakenLoading(false);
-    })();
-  }, []);
 
   /* ── Filters ── */
   const [filters, setFilters] = useState<FilterState>(() =>
