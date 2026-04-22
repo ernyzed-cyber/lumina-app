@@ -8,6 +8,7 @@ import {
   MessageCircleHeart,
   ExternalLink,
   Gift,
+  ChevronDown,
 } from 'lucide-react';
 import { getLocalizedGirlById, type Girl } from '../data/girls';
 import { useAuth } from '../hooks/useAuth';
@@ -220,6 +221,7 @@ export default function Chat() {
   const [giftOpen, setGiftOpen] = useState(false);
   const [paywallOpen, setPaywallOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
   const messagesLeft = DAILY_MESSAGE_LIMIT - msgLimits.count;
 
@@ -370,8 +372,19 @@ export default function Chat() {
     return () => clearTimeout(tm);
   }, [isTyping]);
 
-  /* ── Close emoji picker on click outside ── */
+  /* ── Show/hide scroll-to-bottom button ── */
   useEffect(() => {
+    const el = messagesAreaRef.current;
+    if (!el) return;
+    function onScroll() {
+      const dist = el!.scrollHeight - el!.scrollTop - el!.clientHeight;
+      setShowScrollBtn(dist > 300);
+    }
+    el.addEventListener('scroll', onScroll, { passive: true });
+    return () => el.removeEventListener('scroll', onScroll);
+  }, []);
+
+  /* ── Close emoji picker on click outside ── */  useEffect(() => {
     if (!emojiOpen) return;
     function handleClickOutside(e: MouseEvent) {
       if (emojiPickerRef.current && !emojiPickerRef.current.contains(e.target as Node)) {
@@ -571,8 +584,8 @@ export default function Chat() {
           }
         }
 
-        // После ответа ещё ~90с держим online, потом "была недавно".
-        setTimeout(() => setLiveOnline(false), 90_000);
+        // После ответа ещё ~2мин держим online, потом "была недавно".
+        setTimeout(() => setLiveOnline(false), 120_000);
 
         const lastSeg = segments[segments.length - 1] ?? replyFull;
         void lastSeg; // dialog preview removed in 1:1 model
@@ -785,6 +798,28 @@ export default function Chat() {
 
               <div ref={messagesEndRef} />
             </div>
+
+            {/* ── Scroll to bottom button ── */}
+            <AnimatePresence>
+              {showScrollBtn && (
+                <motion.button
+                  className={s.scrollToBottomBtn}
+                  onClick={() => {
+                    const el = messagesAreaRef.current;
+                    if (!el) return;
+                    el.style.scrollBehavior = 'smooth';
+                    el.scrollTop = el.scrollHeight;
+                  }}
+                  initial={{ opacity: 0, scale: 0.75 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.75 }}
+                  transition={{ duration: 0.18 }}
+                  aria-label="Прокрутить вниз"
+                >
+                  <ChevronDown size={20} />
+                </motion.button>
+              )}
+            </AnimatePresence>
 
             {/* ── Quick replies ── */}
             {messages.length === 0 && (

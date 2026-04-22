@@ -1226,4 +1226,33 @@
   opacity: 0.85;
 }
 
+/* ═══════════════════════════════════════════
+   Scroll-to-bottom button
+   ═══════════════════════════════════════════ */
+.scrollToBottomBtn {
+  position: absolute;
+  /* above input area; adjust if input grows taller */
+  bottom: 88px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--bg-card, #1e1e2e);
+  border: 1px solid var(--border-subtle, rgba(255,255,255,0.08));
+  color: var(--text-primary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+  z-index: 20;
+  transition: background 0.18s, border-color 0.18s;
+}
+
+.scrollToBottomBtn:hover {
+  background: var(--bg-tertiary, #2a2a3e);
+  border-color: var(--accent-purple, #8b5cf6);
+}
+
 
