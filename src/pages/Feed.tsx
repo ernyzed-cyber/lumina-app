@@ -313,14 +313,11 @@ export default function Feed() {
 
   useEffect(() => {
     (async () => {
-      // Используем view taken_girls — возвращает только girl_id без user_id.
-      // RLS на assignments ограничивает чтение своими строками, поэтому
-      // нельзя читать assignments напрямую для фильтрации занятых девушек.
-      const { data, error } = await supabase
-        .from('taken_girls')
-        .select('girl_id');
+      // Используем SECURITY DEFINER функцию — обходит RLS на assignments,
+      // чтобы любой авторизованный пользователь видел занятых девушек.
+      const { data, error } = await supabase.rpc('get_taken_girl_ids');
       if (error) {
-        console.warn('[Feed] taken_girls query failed (table/view may not exist yet):', error.message);
+        console.warn('[Feed] get_taken_girl_ids failed:', error.message);
       }
       setTakenGirlIds(new Set((data ?? []).map((r: { girl_id: string }) => r.girl_id)));
       setTakenLoading(false);
