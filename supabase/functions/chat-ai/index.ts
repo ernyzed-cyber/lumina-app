@@ -327,13 +327,21 @@ function detectRecentAssistantTopics(messages: ChatMessage[]): string[] {
 
 function buildAntiRepeatBlock(messages: ChatMessage[]): string {
   const overused = detectRecentAssistantTopics(messages);
+
+  // Последняя реплика ассистента — не повторять её слова/структуру дословно
+  const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')?.content ?? '';
+  const lastSnippet = lastAssistant.length > 80 ? lastAssistant.slice(0, 80) + '…' : lastAssistant;
+
   const base = [
     '=== ANTI-REPETITION (ВАЖНО) ===',
     '— НЕ упоминай своего питомца, работу или Figma в каждом сообщении. Максимум один раз на 5–6 реплик.',
     '— Не начинай подряд два сообщения с одной и той же темы (кофе, кот, работа).',
     '— Расширяй темы: еда, погода, сериалы/музыка, мечты, мелкие планы на вечер, вопросы про него, воспоминания из детства, что-то смешное из метро/улицы.',
     '— Если собеседник шлёт подарок или короткое сообщение — реагируй КРАТКО и по-новому, не копируй свою предыдущую реакцию.',
-  ];
+    lastSnippet
+      ? `— Твоя ПРЕДЫДУЩАЯ реплика была: «${lastSnippet}». НЕ повторяй те же слова и ту же структуру. Найди другой угол.`
+      : '',
+  ].filter(Boolean);
   if (overused.length > 0) {
     base.push(
       `— Ты уже ПОДРЯД несколько раз упомянула: ${overused.join(', ')}. В следующем ответе НЕ возвращайся к этим темам, выбери что-то другое.`,

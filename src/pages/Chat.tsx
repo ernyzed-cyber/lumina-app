@@ -624,10 +624,11 @@ export default function Chat() {
       inflightRef.current = true;
       try {
         do {
+          // Debounce: ждём 400мс, собирая все быстрые сообщения (подарки, эмодзи и т.п.)
+          // в messagesRef. ПОТОМ сбрасываем флаг — чтобы queuedRef=true, выставленный
+          // сообщениями за эти 400мс, не вызвал лишний второй цикл.
+          await new Promise((r) => setTimeout(r, 400));
           queuedRef.current = false;
-          // Маленькая пауза — даём возможным быстрым подарком/сообщениям
-          // успеть попасть в messagesRef до отправки.
-          await new Promise((r) => setTimeout(r, 250));
           await runAiTurn();
         } while (queuedRef.current);
       } finally {
