@@ -6,7 +6,7 @@
 
 **Architecture:** Telegram Stars as the only payment provider (invoices opened from the web app). New Supabase tables `stars_ledger`, `purchases`, `gift_catalog`, `gifts_sent` and new columns on `profiles` / `girl_relationships` / `memories`. Four new edge functions (`billing-create-invoice`, `billing-webhook`, `gift-send`, `messages-buy-pack`). `chat-ai` gains a daily-limit gate and reads `intimacy_level` + recent gift memories for prompt injection. Full frontend rewrite of `Premium.tsx` → `Shop.tsx`, `Paywall.tsx` → `DailyLimitModal.tsx`, deletion of all like/swipe/super-like UI.
 
-**Tech Stack:** React 19 + TS + Vite, Supabase (ref `rfmcpnpdqbhecwtodyaz`), Grok API (`grok-4-1-fast-reasoning`), Framer Motion, React Router v7, Deno for edge functions, Vitest (new) for frontend tests, `deno test` for edge-function tests, Telegram Stars (`WebApp.openInvoice` via raw script tag + backend `createInvoiceLink`).
+**Tech Stack:** React 19 + TS + Vite, Supabase (ref `rfmcpnpdqbhecwtodyaz`), Grok API (`grok-4-1-fast-reasoning`), Framer Motion, React Router v7, Deno for edge functions, Vitest (new) for frontend tests, `deno test` for edge-function tests, **CryptoCloud** for fiat→stars purchases (USD invoices via `api.cryptocloud.plus/v2`, postback JWT HS256). Telegram is used ONLY for account verification (anti-spam), not for payments.
 
 **Phases:**
 - Phase 0 — Bootstrap test infrastructure (vitest + deno test scaffolding)
@@ -364,10 +364,10 @@ git commit -m "feat(db): add stars_ledger append-only audit table"
 CREATE TABLE IF NOT EXISTS purchases (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
-  provider TEXT NOT NULL,                 -- 'telegram_stars'
+  provider TEXT NOT NULL,                 -- 'cryptocloud'
   provider_payment_id TEXT UNIQUE,        -- telegram's payment_charge_id
   provider_invoice_payload TEXT,          -- custom payload we attached to invoice
-  pack_id TEXT NOT NULL,                  -- 'stars_100' | 'stars_500' | 'stars_2000' | 'stars_10000'
+  pack_id TEXT NOT NULL,                  -- 'stars_100' | 'stars_550' | 'stars_2400' | 'stars_13000'
   stars_amount INT NOT NULL CHECK (stars_amount > 0),
   fiat_amount NUMERIC(10,2),
   fiat_currency TEXT,
@@ -616,7 +616,16 @@ git commit -m "feat(db): add spend_stars and credit_stars RPC functions"
 
 ## Phase 2 — Edge Function: `billing-create-invoice`
 
-**Context:** Frontend POSTs `{ pack_id }`, we verify the user, create a `purchases` row (status=`pending`), call Telegram Bot API `createInvoiceLink` with a payload containing the purchase id, return `{ invoice_url, purchase_id }`. The client opens it via `WebApp.openInvoice(url)` inside Telegram or a standard `<a>` in browsers.
+> **⚠️ PIVOT NOTICE (2026-04-23):** Этот раздел исторический. Phase 2 был полностью переписан под **CryptoCloud** (крипто-эквайринг, USD). Telegram Stars / XTR / `createInvoiceLink` / `WebApp.openInvoice` отменены — Telegram остаётся ТОЛЬКО для верификации аккаунта (anti-spam). Финальный код: `supabase/functions/billing-create-invoice/{packs.ts,handler.ts,handler.test.ts,index.ts}`. Реальная реализация:
+> - `POST https://api.cryptocloud.plus/v2/invoice/create` с header `Authorization: Token <CRYPTOCLOUD_API_KEY>` и body `{shop_id, amount, currency:"USD", order_id: purchase.id}`
+> - Response `{status:"success", result:{uuid:"INV-XXXX", link:"https://pay.cryptocloud.plus/XXXX"}}` парсится с зачисткой `INV-` префикса
+> - Возвращает `{ pay_url, invoice_id, purchase_id, pack: { id, stars, amount_usd } }` — фронт делает `window.location = pay_url`
+> - Pack pricing — см. spec (`stars_100/$5`, `stars_550/$25 +10%`, `stars_2400/$100 +20%`, `stars_13000/$500 +30%`)
+> - Env: `CRYPTOCLOUD_API_KEY`, `CRYPTOCLOUD_SHOP_ID`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+>
+> Tests passing: 5/5. Текст ниже сохранён для истории дизайн-решений (handler shape, pack-IDs, deps-injection pattern остались валидными).
+
+**Context (HISTORICAL — Telegram Stars version):** Frontend POSTs `{ pack_id }`, we verify the user, create a `purchases` row (status=`pending`), call Telegram Bot API `createInvoiceLink` with a payload containing the purchase id, return `{ invoice_url, purchase_id }`. The client opens it via `WebApp.openInvoice(url)` inside Telegram or a standard `<a>` in browsers.
 
 **Env vars required on edge runtime:**
 - `SUPABASE_URL`
@@ -632,7 +641,7 @@ git commit -m "feat(db): add spend_stars and credit_stars RPC functions"
 - [ ] **Step 1: Write packs catalog**
 
 ```ts
-export type PackId = 'stars_100' | 'stars_500' | 'stars_2000' | 'stars_10000';
+export type PackId = 'stars_100' | 'stars_550' | 'stars_2400' | 'stars_13000';
 
 export interface Pack {
   id: PackId;
@@ -643,9 +652,9 @@ export interface Pack {
 
 export const PACKS: Record<PackId, Pack> = {
   stars_100:   { id: 'stars_100',   stars: 100,   title: '100 ⭐',    description: 'Starter pack — 100 Stars' },
-  stars_500:   { id: 'stars_500',   stars: 500,   title: '500 ⭐',    description: 'Popular — 500 Stars' },
-  stars_2000:  { id: 'stars_2000',  stars: 2000,  title: '2 000 ⭐',  description: 'Best value — 2 000 Stars' },
-  stars_10000: { id: 'stars_10000', stars: 10000, title: '10 000 ⭐', description: 'Whale pack — 10 000 Stars' },
+  stars_550:   { id: 'stars_550',   stars: 550,   title: '550 ⭐',    description: 'Popular — 500 + 50 bonus' },
+  stars_2400:  { id: 'stars_2400',  stars: 2400,  title: '2 400 ⭐',  description: 'Best value — 2000 + 400 bonus' },
+  stars_13000: { id: 'stars_13000', stars: 13000, title: '13 000 ⭐', description: 'Whale pack — 10000 + 3000 bonus' },
 };
 
 export function isPackId(v: unknown): v is PackId {
@@ -715,7 +724,7 @@ Deno.test('creates purchase and returns invoice url for valid pack', async () =>
     insertPurchase: async (args) => { calls.insertPurchase = args; return { id: 'pur-42' }; },
     createInvoiceLink: async (args) => { calls.createInvoiceLink = args; return 'https://t.me/x'; },
   });
-  const res = await handleCreateInvoice({ userId: 'u1', packId: 'stars_500' }, deps);
+  const res = await handleCreateInvoice({ userId: 'u1', packId: 'stars_550' }, deps);
   assertEquals(res, { invoice_url: 'https://t.me/x', purchase_id: 'pur-42' });
   assertEquals((calls.insertPurchase as any).stars, 500);
   assertEquals((calls.createInvoiceLink as any).stars, 500);
@@ -895,7 +904,18 @@ git commit -m "feat(edge): billing-create-invoice with telegram stars"
 
 ## Phase 3 — Edge Function: `billing-webhook`
 
-**Context:** Telegram sends `pre_checkout_query` + successful payment updates to a webhook. We verify the payment is ours (via payload = `purchase:<purchase_id>`), mark `purchases.status='completed'`, call `credit_stars` RPC (idempotent by `(reason, ref_id)`), and answer Telegram.
+> **⚠️ PIVOT NOTICE (2026-04-23):** Phase 3 был переписан под **CryptoCloud postback**. Telegram Bot API (`pre_checkout_query`/`successful_payment`) больше не используется. Финальный код: `supabase/functions/billing-webhook/{handler.ts,handler.test.ts,index.ts}`. Реальная реализация:
+> - CryptoCloud шлёт `POST` (JSON или form-encoded) с полями `{status, invoice_id, amount_crypto, currency, order_id, token, invoice_info:{invoice_status, amount_paid_usd}}`
+> - `token` — JWT HS256, подписанный `CRYPTOCLOUD_SECRET_KEY` — верифицируется через Web Crypto (`crypto.subtle.importKey` + `sign` + timing-safe compare)
+> - Success states: `paid` | `success` | `overpaid`. Остальные — игнор с `200 OK` (никаких ретраев)
+> - Идемпотентность: `credit_stars(p_reason='purchase:cryptocloud', p_ref_id=invoice_id)` через UNIQUE `(reason, ref_id)` на `stars_ledger`
+> - Amount tolerance: ≥99% от `purchase.fiat_amount` (защита от крипто-курсовых колебаний)
+> - Deploy с `--no-verify-jwt` (CryptoCloud не шлёт Supabase JWT)
+> - Env: `CRYPTOCLOUD_SECRET_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`
+>
+> Tests passing: 7/7. Текст ниже сохранён для истории (idempotency pattern, error policy "always 200" остались валидными).
+
+**Context (HISTORICAL — Telegram Stars version):** Telegram sends `pre_checkout_query` + successful payment updates to a webhook. We verify the payment is ours (via payload = `purchase:<purchase_id>`), mark `purchases.status='completed'`, call `credit_stars` RPC (idempotent by `(reason, ref_id)`), and answer Telegram.
 
 This is **security-critical** and **money-critical**. TDD is mandatory.
 
@@ -2357,7 +2377,7 @@ export interface StarsState {
 
 export interface UseStarsReturn extends StarsState {
   refetch: () => Promise<void>;
-  buyPack: (pack: 'stars_100' | 'stars_500' | 'stars_2000' | 'stars_10000') => Promise<void>;
+  buyPack: (pack: 'stars_100' | 'stars_550' | 'stars_2400' | 'stars_13000') => Promise<void>;
   buyMessagesPack: () => Promise<void>;
 }
 
@@ -2488,7 +2508,7 @@ export interface StarsState {
 
 export interface UseStarsReturn extends StarsState {
   refetch: () => Promise<void>;
-  buyPack: (pack: 'stars_100' | 'stars_500' | 'stars_2000' | 'stars_10000') => Promise<void>;
+  buyPack: (pack: 'stars_100' | 'stars_550' | 'stars_2400' | 'stars_13000') => Promise<void>;
   buyMessagesPack: () => Promise<void>;
 }
 
@@ -2529,7 +2549,7 @@ export function useStars(): UseStarsReturn {
 
   useEffect(() => { void refetch(); }, [refetch]);
 
-  const buyPack = useCallback(async (pack: 'stars_100' | 'stars_500' | 'stars_2000' | 'stars_10000') => {
+  const buyPack = useCallback(async (pack: 'stars_100' | 'stars_550' | 'stars_2400' | 'stars_13000') => {
     const { data, error } = await supabase.functions.invoke('billing-create-invoice', { body: { kind: 'pack', pack } });
     if (error || !data?.invoice_url) { tg.haptic('error'); throw error ?? new Error('no invoice_url'); }
     tg.openInvoice(data.invoice_url, async (status) => {
@@ -2610,9 +2630,9 @@ import { useT } from '../i18n';
 
 const PACKS = [
   { id: 'stars_100' as const, stars: 100, price: 100, bonus: 0 },
-  { id: 'stars_500' as const, stars: 550, price: 500, bonus: 50 },
-  { id: 'stars_2000' as const, stars: 2400, price: 2000, bonus: 400 },
-  { id: 'stars_10000' as const, stars: 13000, price: 10000, bonus: 3000 },
+  { id: 'stars_550' as const, stars: 550, price: 500, bonus: 50 },
+  { id: 'stars_2400' as const, stars: 2400, price: 2000, bonus: 400 },
+  { id: 'stars_13000' as const, stars: 13000, price: 10000, bonus: 3000 },
 ];
 
 export default function Shop() {
@@ -2913,7 +2933,7 @@ export function DailyLimitModal({ open, variant, neededStars, inCharacterMessage
                 <div className="text-4xl text-center mb-3">⭐</div>
                 <h2 className="text-xl font-semibold text-center mb-2">{t('dailyLimit.notEnough')}</h2>
                 <p className="text-white/60 text-center mb-5">{t('dailyLimit.need', { n: neededStars ?? 0 })}</p>
-                <button onClick={() => void buyPack('stars_500')}
+                <button onClick={() => void buyPack('stars_550')}
                   className="w-full py-3 rounded-2xl bg-gradient-to-r from-amber-500 to-fuchsia-500 text-black font-semibold">
                   {t('dailyLimit.topUp')}
                 </button>

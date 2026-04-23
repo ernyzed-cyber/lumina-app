@@ -13,7 +13,7 @@
 
 - **Нет подписки.** Нет тиров (Free/Premium/Intimate отменены).
 - **Нет trial.** Отношения всегда серьёзные, не «тестовый период».
-- **Stars ⭐** — единственная валюта. Покупается за деньги (Telegram Stars primary, Stripe fallback later).
+- **Stars ⭐** — единственная внутренняя валюта. Покупается за деньги через **CryptoCloud** (крипто-эквайринг: BTC/ETH/USDT/etc., инвойсы в USD). Telegram используется ТОЛЬКО для верификации аккаунта (anti-spam), не для оплаты.
 - Всё существующее в `Premium.tsx`/`Paywall.tsx` с tinder-наследием (unlimited likes, see who liked, gold badge, rewind, priority, swipes) — **удаляется**.
 
 ## What Stars Buy
@@ -86,22 +86,25 @@ id UUID PK
 user_id UUID FK profiles
 delta INT NOT NULL  -- +purchase, -spend
 reason TEXT NOT NULL  -- 'purchase:pack_500', 'spend:gift:ring', 'spend:messages:100', 'spend:date:dinner', 'refund:...'
-ref_id TEXT  -- external ref (telegram payment_id, or gift uuid)
+ref_id TEXT  -- external ref (CryptoCloud invoice_id, or gift uuid)
 balance_after INT NOT NULL
 created_at TIMESTAMPTZ DEFAULT now()
 ```
 
-**`purchases`** — внешние платежи (TG Stars webhooks)
+**`purchases`** — внешние платежи (CryptoCloud postbacks)
 ```
 id UUID PK
 user_id UUID FK
-provider TEXT  -- 'telegram_stars'
-provider_payment_id TEXT UNIQUE
-stars_amount INT
-fiat_amount NUMERIC  -- для отчётности
-fiat_currency TEXT
-status TEXT  -- 'pending'|'completed'|'refunded'|'failed'
+provider TEXT  -- 'cryptocloud'
+provider_payment_id TEXT UNIQUE  -- CryptoCloud invoice_id (without "INV-" prefix)
+provider_invoice_payload TEXT    -- pay_url для редиректа юзера
+pack_id TEXT                     -- 'stars_100' | 'stars_550' | 'stars_2400' | 'stars_13000'
+stars_amount INT                 -- credited stars (включая bonus)
+fiat_amount NUMERIC              -- USD
+fiat_currency TEXT               -- 'USD'
+status TEXT                      -- 'pending'|'completed'|'refunded'|'failed'
 created_at TIMESTAMPTZ
+completed_at TIMESTAMPTZ
 completed_at TIMESTAMPTZ
 ```
 
@@ -136,7 +139,15 @@ created_at TIMESTAMPTZ
 ## Edge Functions
 
 ### New: `billing-create-invoice`
-POST, требует auth. Body: `{ pack: 'stars_100'|'stars_500'|'stars_2000'|'stars_10000' }`. Возвращает Telegram invoice URL. Создаёт `purchases` row со статусом `pending`.
+POST, требует auth. Body: `{ pack_id: 'stars_100'|'stars_550'|'stars_2400'|'stars_13000' }`. Создаёт `purchases` row со статусом `pending`, вызывает `POST https://api.cryptocloud.plus/v2/invoice/create` с `amount` в USD и `order_id = purchase.id`. Возвращает `{ pay_url, invoice_id, purchase_id, pack: { id, stars, amount_usd } }` — фронт делает `window.location = pay_url` (или открывает в новой вкладке).
+
+**Pack pricing** ($0.05/⭐ base, bonus stars on larger packs to incentivize whales):
+| Pack ID | Stars (base + bonus) | Price USD |
+|---|---|---|
+| `stars_100` | 100 | $5 |
+| `stars_550` | 500 + 50 (10%) | $25 |
+| `stars_2400` | 2000 + 400 (20%) | $100 |
+| `stars_13000` | 10000 + 3000 (30%) | $500 |
 
 ### New: `billing-webhook`
 Публичный endpoint (secret verification). Принимает TG Stars payment confirmation → marks `purchases.status='completed'` → appends `stars_ledger` (+delta) → updates `profiles.stars_balance`. Идемпотентен по `provider_payment_id`.
@@ -227,7 +238,7 @@ POST auth. Body: `{ pack: 'msg_100' }`. Deducts 100⭐, increments `messages_bou
 - ✅ **Лимит сообщений**: 100/день + 100⭐ за +100 docupable
 - ✅ **NSFW**: hybrid intimacy + trigger events
 - ✅ **Re-roll**: нет, только `/leave` = полный reset аккаунта (метафорически разрыв)
-- ✅ **Provider**: Telegram Stars primary, Stripe позже
+- ✅ **Provider**: CryptoCloud (крипто-эквайринг, USD invoices). Telegram = только верификация аккаунта.
 
 ## Next Step
 

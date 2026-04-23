@@ -1,38 +1,64 @@
-import { PACKS, isPackId, type PackId } from './packs.ts';
+import { findPack, type StarsPack } from './packs.ts';
 
 export interface CreateInvoiceDeps {
-  createInvoiceLink: (args: { payload: string; stars: number; title: string; description: string }) => Promise<string>;
-  insertPurchase: (args: { userId: string; packId: PackId; stars: number }) => Promise<{ id: string }>;
+  insertPurchase: (args: {
+    id: string;
+    userId: string;
+    packId: string;
+    stars: number;
+    amountUsd: number;
+  }) => Promise<void>;
+  createCryptoCloudInvoice: (args: {
+    amountUsd: number;
+    orderId: string;
+  }) => Promise<{ invoice_id: string; pay_url: string }>;
+  attachInvoiceToPurchase: (args: {
+    purchaseId: string;
+    invoiceId: string;
+    payUrl: string;
+  }) => Promise<void>;
+  newUuid: () => string;
 }
 
-export interface CreateInvoiceRequest {
-  userId: string;
-  packId: string;
-}
-
-export interface CreateInvoiceResponse {
-  invoice_url: string;
+export interface CreateInvoiceResult {
+  pay_url: string;
+  invoice_id: string;
   purchase_id: string;
+  pack: { id: string; stars: number; amount_usd: number };
 }
 
 export async function handleCreateInvoice(
-  req: CreateInvoiceRequest,
+  req: { userId: string; packId: string },
   deps: CreateInvoiceDeps,
-): Promise<CreateInvoiceResponse> {
-  if (!isPackId(req.packId)) {
-    throw new Error(`invalid pack: ${req.packId}`);
-  }
-  const pack = PACKS[req.packId];
-  const purchase = await deps.insertPurchase({
+): Promise<CreateInvoiceResult> {
+  const pack: StarsPack | undefined = findPack(req.packId);
+  if (!pack) throw new Error(`unknown pack: ${req.packId}`);
+
+  const purchaseId = deps.newUuid();
+
+  await deps.insertPurchase({
+    id: purchaseId,
     userId: req.userId,
     packId: pack.id,
-    stars: pack.stars,
+    stars: pack.stars, // includes bonus
+    amountUsd: pack.amount_usd,
   });
-  const url = await deps.createInvoiceLink({
-    payload: `purchase:${purchase.id}`,
-    stars: pack.stars,
-    title: pack.title,
-    description: pack.description,
+
+  const cc = await deps.createCryptoCloudInvoice({
+    amountUsd: pack.amount_usd,
+    orderId: purchaseId,
   });
-  return { invoice_url: url, purchase_id: purchase.id };
+
+  await deps.attachInvoiceToPurchase({
+    purchaseId,
+    invoiceId: cc.invoice_id,
+    payUrl: cc.pay_url,
+  });
+
+  return {
+    pay_url: cc.pay_url,
+    invoice_id: cc.invoice_id,
+    purchase_id: purchaseId,
+    pack: { id: pack.id, stars: pack.stars, amount_usd: pack.amount_usd },
+  };
 }

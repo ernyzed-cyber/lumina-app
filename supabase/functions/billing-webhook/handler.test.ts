@@ -1,71 +1,89 @@
-import { assertEquals, assertRejects } from 'https://deno.land/std@0.224.0/assert/mod.ts';
-import { handleSuccessfulPayment, type WebhookDeps, type TelegramSuccessfulPayment } from './handler.ts';
+import { assertEquals } from 'https://deno.land/std@0.224.0/assert/mod.ts';
+import { handlePostback, type WebhookDeps, type Postback } from './handler.ts';
 
-function baseDeps(over: Partial<WebhookDeps> = {}): WebhookDeps {
+function pb(over: Partial<Postback> = {}): Postback {
   return {
-    findPurchase: async () => ({ id: 'pur-1', user_id: 'u1', stars_amount: 500, status: 'pending' }),
+    status: 'success',
+    invoice_id: '89UX09KA',
+    order_id: '00000000-0000-0000-0000-000000000001',
+    token: 'jwt.token.sig',
+    invoice_info: { invoice_status: 'paid', amount_paid_usd: 5.0 },
+    ...over,
+  };
+}
+
+function deps(over: Partial<WebhookDeps> = {}): WebhookDeps {
+  return {
+    verifyToken: async () => true,
+    loadPurchase: async () => ({
+      id: '00000000-0000-0000-0000-000000000001',
+      user_id: 'u1',
+      pack_id: 'stars_100',
+      stars_amount: 100,
+      fiat_amount: 5.0,
+      fiat_currency: 'USD',
+      status: 'pending',
+    }),
+    creditStars: async () => 100,
     markCompleted: async () => {},
-    creditStars: async () => 500,
     ...over,
   };
 }
 
-function payment(over: Partial<TelegramSuccessfulPayment> = {}): TelegramSuccessfulPayment {
-  return {
-    currency: 'XTR',
-    total_amount: 500,
-    invoice_payload: 'purchase:123e4567-e89b-12d3-a456-426614174000',
-    telegram_payment_charge_id: 'tg-charge-1',
-    provider_payment_charge_id: 'prov-1',
-    ...over,
-  };
-}
-
-Deno.test('rejects non-XTR currency', async () => {
-  await assertRejects(
-    () => handleSuccessfulPayment(payment({ currency: 'USD' }), baseDeps()),
-    Error,
-    'currency',
-  );
+Deno.test('rejects when JWT token invalid', async () => {
+  const res = await handlePostback(pb(), deps({ verifyToken: async () => false }));
+  assertEquals(res, { handled: false, reason: 'invalid token' });
 });
 
-Deno.test('rejects malformed payload', async () => {
-  await assertRejects(
-    () => handleSuccessfulPayment(payment({ invoice_payload: 'garbage' }), baseDeps()),
-    Error,
-    'payload',
-  );
+Deno.test('rejects malformed order_id', async () => {
+  const res = await handlePostback(pb({ order_id: 'not-a-uuid' }), deps());
+  assertEquals(res.handled, false);
+  assertEquals(res.reason, 'malformed order_id');
 });
 
-Deno.test('returns ignored when purchase not found', async () => {
-  const res = await handleSuccessfulPayment(payment(), baseDeps({ findPurchase: async () => null }));
-  assertEquals(res, { status: 'ignored' });
+Deno.test('ignores non-success invoice_status', async () => {
+  const res = await handlePostback(pb({ invoice_info: { invoice_status: 'canceled', amount_paid_usd: 0 } }), deps());
+  assertEquals(res.handled, false);
+  assertEquals(res.reason, 'ignored status canceled');
 });
 
-Deno.test('returns duplicate when purchase already completed', async () => {
-  const res = await handleSuccessfulPayment(
-    payment(),
-    baseDeps({ findPurchase: async () => ({ id: 'pur-1', user_id: 'u1', stars_amount: 500, status: 'completed' }) }),
-  );
-  assertEquals(res.status, 'duplicate');
-});
-
-Deno.test('rejects when amount mismatches', async () => {
-  await assertRejects(
-    () => handleSuccessfulPayment(payment({ total_amount: 499 }), baseDeps()),
-    Error,
-    'amount',
-  );
-});
-
-Deno.test('credits stars and marks completed on happy path', async () => {
-  const called: Record<string, unknown> = {};
-  const res = await handleSuccessfulPayment(payment(), baseDeps({
-    markCompleted: async (args) => { called.markCompleted = args; },
-    creditStars: async (args) => { called.creditStars = args; return 1500; },
+Deno.test('returns already-completed when purchase already paid', async () => {
+  const res = await handlePostback(pb(), deps({
+    loadPurchase: async () => ({
+      id: '00000000-0000-0000-0000-000000000001',
+      user_id: 'u1', pack_id: 'stars_100', stars_amount: 100,
+      fiat_amount: 5.0, fiat_currency: 'USD', status: 'completed',
+    }),
   }));
-  assertEquals(res, { status: 'ok', balance: 1500 });
-  assertEquals((called.markCompleted as { purchaseId: string }).purchaseId, '123e4567-e89b-12d3-a456-426614174000');
-  assertEquals((called.markCompleted as { providerPaymentId: string }).providerPaymentId, 'tg-charge-1');
-  assertEquals(called.creditStars, { userId: 'u1', amount: 500, refId: 'tg-charge-1' });
+  assertEquals(res, { handled: true, reason: 'already completed' });
+});
+
+Deno.test('rejects when amount_paid_usd is short of expected (>1%)', async () => {
+  const res = await handlePostback(pb({ invoice_info: { invoice_status: 'paid', amount_paid_usd: 4.0 } }), deps());
+  assertEquals(res.handled, false);
+  assertEquals(res.reason?.startsWith('amount mismatch'), true);
+});
+
+Deno.test('accepts overpaid status', async () => {
+  let credited = 0;
+  const res = await handlePostback(
+    pb({ invoice_info: { invoice_status: 'overpaid', amount_paid_usd: 6.0 } }),
+    deps({ creditStars: async (a) => { credited = a.amount; return 100; } }),
+  );
+  assertEquals(res, { handled: true, reason: 'credited' });
+  assertEquals(credited, 100);
+});
+
+Deno.test('happy path credits stars and marks completed', async () => {
+  let credit: any = null;
+  let mark: any = null;
+  const res = await handlePostback(pb(), deps({
+    creditStars: async (a) => { credit = a; return 100; },
+    markCompleted: async (a) => { mark = a; },
+  }));
+  assertEquals(res, { handled: true, reason: 'credited' });
+  assertEquals(credit, {
+    userId: 'u1', amount: 100, reason: 'purchase:cryptocloud', refId: '89UX09KA',
+  });
+  assertEquals(mark, { purchaseId: '00000000-0000-0000-0000-000000000001', providerPaymentId: '89UX09KA' });
 });

@@ -1,19 +1,60 @@
-export type PackId = 'stars_100' | 'stars_500' | 'stars_2000' | 'stars_10000';
-
-export interface Pack {
-  id: PackId;
+/**
+ * Stars packs catalog — F2P monetization.
+ *
+ * Pricing strategy: $0.05 per ⭐ base, with bonus stars on larger packs
+ * to incentivize whale spending while keeping entry low.
+ *
+ *   Pack          Stars    Price (USD)   Bonus
+ *   ────────────  ───────  ────────────  ─────────
+ *   stars_100     100      $5.00         baseline
+ *   stars_550     550      $25.00        +50 (10%)
+ *   stars_2400    2400     $100.00       +400 (20%)
+ *   stars_13000   13000    $500.00       +3000 (30%)
+ */
+export interface StarsPack {
+  id: string;
   stars: number;
-  title: string;
-  description: string;
+  amount_usd: number;
+  bonus_stars: number;
+  label_ru: string;
+  label_en: string;
 }
 
-export const PACKS: Record<PackId, Pack> = {
-  stars_100:   { id: 'stars_100',   stars: 100,   title: '100 ⭐',    description: 'Starter pack — 100 Stars' },
-  stars_500:   { id: 'stars_500',   stars: 500,   title: '500 ⭐',    description: 'Popular — 500 Stars' },
-  stars_2000:  { id: 'stars_2000',  stars: 2000,  title: '2 000 ⭐',  description: 'Best value — 2 000 Stars' },
-  stars_10000: { id: 'stars_10000', stars: 10000, title: '10 000 ⭐', description: 'Whale pack — 10 000 Stars' },
-};
+export const STARS_PACKS: readonly StarsPack[] = [
+  {
+    id: 'stars_100',
+    stars: 100,
+    amount_usd: 5.0,
+    bonus_stars: 0,
+    label_ru: '100 ⭐',
+    label_en: '100 ⭐',
+  },
+  {
+    id: 'stars_550',
+    stars: 550,
+    amount_usd: 25.0,
+    bonus_stars: 50,
+    label_ru: '550 ⭐ (+50 бонус)',
+    label_en: '550 ⭐ (+50 bonus)',
+  },
+  {
+    id: 'stars_2400',
+    stars: 2400,
+    amount_usd: 100.0,
+    bonus_stars: 400,
+    label_ru: '2 400 ⭐ (+400 бонус)',
+    label_en: '2,400 ⭐ (+400 bonus)',
+  },
+  {
+    id: 'stars_13000',
+    stars: 13000,
+    amount_usd: 500.0,
+    bonus_stars: 3000,
+    label_ru: '13 000 ⭐ (+3 000 бонус)',
+    label_en: '13,000 ⭐ (+3,000 bonus)',
+  },
+] as const;
 
-export function isPackId(v: unknown): v is PackId {
-  return typeof v === 'string' && v in PACKS;
+export function findPack(id: string): StarsPack | undefined {
+  return STARS_PACKS.find((p) => p.id === id);
 }
