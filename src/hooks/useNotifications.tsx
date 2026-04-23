@@ -131,6 +131,16 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
 
   const bannerTimerRef = useRef<number | null>(null);
 
+  // Refs для стабильной refresh() без пересоздания при каждом изменении readIds/deletedIds
+  const readIdsRef = useRef<Set<string>>(readIds);
+  const deletedIdsRef = useRef<Set<string>>(deletedIds);
+  useEffect(() => {
+    readIdsRef.current = readIds;
+  }, [readIds]);
+  useEffect(() => {
+    deletedIdsRef.current = deletedIds;
+  }, [deletedIds]);
+
   /* ── Показать баннер с авто-скрытием ── */
   const pushBanner = useCallback((n: AppNotification) => {
     setCurrentBanner(n);
@@ -156,14 +166,21 @@ export function NotificationsProvider({ children }: { children: React.ReactNode 
     }
 
     try {
+      // SELECT id вместо count(*), чтобы учесть локальные readIds/deletedIds overrides.
+      // Иначе badge «оживает» после перехода между вкладками, если в БД есть is_read=false row.
       const notifRes = await supabase
         .from('notifications')
-        .select('id', { count: 'exact', head: true })
+        .select('id')
         .eq('user_id', user.id)
         .eq('is_read', false);
 
-      if (!notifRes.error) {
-        setUnreadNotifications(notifRes.count ?? 0);
+      if (!notifRes.error && notifRes.data) {
+        const readSet = readIdsRef.current;
+        const delSet = deletedIdsRef.current;
+        const visible = notifRes.data.filter(
+          (r) => !readSet.has(r.id) && !delSet.has(r.id),
+        );
+        setUnreadNotifications(visible.length);
       }
     } catch {
       // silent
