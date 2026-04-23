@@ -247,6 +247,101 @@ function buildUserContextBlock(profile: Record<string, unknown> | null): string 
   return 'WHAT YOU KNOW ABOUT HIM:\n' + parts.join(' ');
 }
 
+// ---------------------------------------------------------------------------
+// Daily flavor + anti-repetition
+// ---------------------------------------------------------------------------
+
+/** FNV-1a 32-bit — детерминистичный хэш для seed'а «события дня». */
+function fnv1a(str: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < str.length; i++) {
+    h ^= str.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return h >>> 0;
+}
+
+// Пул мелких «событий дня». Каждое — небольшой штрих, даёт модели свежую тему,
+// чтобы не зацикливалась на питомце/работе. Меняется ежедневно, детерминистично
+// по (girlId, дата), поэтому в течение одного дня она сама помнит этот «контекст».
+const DAILY_EVENTS: string[] = [
+  'утром разлила кофе на стол, пришлось переодеваться',
+  'вчера вечером начала смотреть новый сериал — пока не решила, нравится или нет',
+  'подруга зовёт на выходные выбраться за город',
+  'немного болит спина — видимо неправильно сидела за ноутом',
+  'на обед хотела суши, но в итоге взяла пасту',
+  'в метро сегодня играл уличный музыкант, зависла послушать',
+  'заказала новый крем, жду доставку',
+  'нашла на балконе забытую книжку, теперь хочу дочитать',
+  'соседи сверху опять громко топают, бесит немного',
+  'на улице неожиданно стало тепло, куртка оказалась лишней',
+  'увидела в сторис у знакомой клёвое кафе, хочу сходить',
+  'вчера пересматривала старые фотки, ностальгия накрыла',
+  'купила себе букетик тюльпанов просто так',
+  'забыла поставить будильник, еле проснулась',
+  'пробовала новый рецепт омлета с сыром — получилось неплохо',
+  'на работе/учёбе скинули дурацкую задачу, голова гудит',
+  'посмотрела смешной рилс про котов, ржала минут пять',
+  'давно не звонила маме, сегодня наконец поговорили',
+  'планирую вечером зайти в книжный просто полистать',
+  'кажется, скоро нужно будет постричься',
+];
+
+function buildDailyFlavorBlock(girlId: string, localIsoDate: string): string {
+  const seed = fnv1a(`${girlId}|${localIsoDate}`);
+  const event = DAILY_EVENTS[seed % DAILY_EVENTS.length];
+  return [
+    '=== TODAY\'S SMALL EVENT (use ONCE if it fits naturally, don\'t force) ===',
+    `Сегодня у тебя было вот что: ${event}.`,
+    'Можешь обронить про это мимоходом, если разговор повернёт в ту сторону. Не начинай с этого сообщение. Не повторяй эту деталь во ВТОРОЙ раз за день.',
+  ].join('\n');
+}
+
+/** Считает, какие «якорные» темы уже упоминались в последних репликах ассистента,
+ *  чтобы явно запретить их повторять. */
+function detectRecentAssistantTopics(messages: ChatMessage[]): string[] {
+  const recentAssistant = messages
+    .filter((m) => m.role === 'assistant')
+    .slice(-5)
+    .map((m) => m.content.toLowerCase())
+    .join(' ');
+
+  const topics: Array<{ re: RegExp; label: string }> = [
+    { re: /\b(кот|кошк|барсик|мурзик|котик|котейк)/i, label: 'питомец (кот)' },
+    { re: /\bфигм/i, label: 'Figma / работа в Figma' },
+    { re: /\b(работ[аеы]|дедлайн|задач[аи]|проект)/i, label: 'работа/проекты' },
+    { re: /\bкофе\b/i, label: 'кофе' },
+    { re: /\bноут|комп\b/i, label: 'ноут/комп' },
+  ];
+
+  const hits: string[] = [];
+  for (const { re, label } of topics) {
+    // считаем вхождения
+    const matches = recentAssistant.match(new RegExp(re.source, 'gi'));
+    if (matches && matches.length >= 2) {
+      hits.push(label);
+    }
+  }
+  return hits;
+}
+
+function buildAntiRepeatBlock(messages: ChatMessage[]): string {
+  const overused = detectRecentAssistantTopics(messages);
+  const base = [
+    '=== ANTI-REPETITION (ВАЖНО) ===',
+    '— НЕ упоминай своего питомца, работу или Figma в каждом сообщении. Максимум один раз на 5–6 реплик.',
+    '— Не начинай подряд два сообщения с одной и той же темы (кофе, кот, работа).',
+    '— Расширяй темы: еда, погода, сериалы/музыка, мечты, мелкие планы на вечер, вопросы про него, воспоминания из детства, что-то смешное из метро/улицы.',
+    '— Если собеседник шлёт подарок или короткое сообщение — реагируй КРАТКО и по-новому, не копируй свою предыдущую реакцию.',
+  ];
+  if (overused.length > 0) {
+    base.push(
+      `— Ты уже ПОДРЯД несколько раз упомянула: ${overused.join(', ')}. В следующем ответе НЕ возвращайся к этим темам, выбери что-то другое.`,
+    );
+  }
+  return base.join('\n');
+}
+
 function buildMemoryBlock(
   memories: Array<{ summary: string; created_at: string }>,
 ): string {
@@ -399,6 +494,8 @@ Deno.serve(async (req: Request) => {
       }
 
       if (personaPrompt) {
+        // Дата для детерминистичного «события дня» — YYYY-MM-DD в её TZ.
+        const localDate = localTime.iso.slice(0, 10);
         systemPrompt = [
           buildTimeBlock(city, timezone, localTime),
           personaPrompt,
@@ -411,6 +508,10 @@ Deno.serve(async (req: Request) => {
           '',
           '=== MEMORY ===',
           buildMemoryBlock(memories),
+          '',
+          buildDailyFlavorBlock(girlId, localDate),
+          '',
+          buildAntiRepeatBlock(messages),
           '',
           '=== MESSAGING STYLE ===',
           'You may split your reply into 1–3 short messages separated by a double newline (\\n\\n). Use multiple messages only when it feels natural: reaction then question, agreement then a second thought, a quick correction. Most replies are 1 message. Never force splitting.',

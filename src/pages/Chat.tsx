@@ -217,6 +217,12 @@ export default function Chat() {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
   const giftPickerRef = useRef<HTMLDivElement>(null);
+  // Мьютекс против двойного ответа. Пока идёт текущий AI-цикл (fetch+schedule+сегменты),
+  // новые sendMessage добавляют user-бабл но НЕ стартуют параллельный fetch.
+  // По завершении цикла, если флаг выставлен — делаем ещё один цикл с обновлённым контекстом.
+  const inflightRef = useRef(false);
+  const queuedRef = useRef(false);
+  const messagesRef = useRef<Message[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [giftOpen, setGiftOpen] = useState(false);
@@ -450,6 +456,124 @@ export default function Chat() {
     [user, currentGirl],
   );
 
+  /* ── Зеркало messages в ref для runAiTurn (читает последний контекст вне зависимостей callback) ── */
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
+
+  /* ── Один AI-цикл: fetch → schedule → вывод сегментов. ──
+     Читает актуальный контекст из messagesRef, поэтому очередь из нескольких
+     быстрых user-сообщений сольётся в ОДИН ответ. */
+  const runAiTurn = useCallback(async () => {
+    if (!currentGirl) return;
+    try {
+      const recent = messagesRef.current.slice(-8).map((m) => ({
+        role: m.role,
+        content: m.content,
+      }));
+
+      const res = await fetch(import.meta.env.VITE_EDGE_FUNCTION_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session?.access_token}`,
+        },
+        body: JSON.stringify({
+          messages: recent,
+          girlId: currentGirl.id,
+          userId: user?.id,
+        }),
+      });
+
+      if (!res.ok) {
+        const errText = await res.text().catch(() => '');
+        console.error('[chat-ai] API error', res.status, errText);
+        throw new Error(`API error ${res.status}: ${errText}`);
+      }
+
+      const data = await res.json();
+
+      if (data?.skipped === 'sleep') {
+        console.log('[chat-ai] sleep-skip:', data?.local_time);
+        return;
+      }
+
+      const rawReply =
+        data?.reply ??
+        data?.choices?.[0]?.message?.content ??
+        data?.content ??
+        '';
+      const replyFull =
+        (typeof rawReply === 'string' ? rawReply.trim() : '') ||
+        t('chat.aiFallbackReply');
+
+      const schedule = (data?.schedule as
+        | { ignoreMs: number; onlineMs: number; typingMs: number }
+        | undefined) ?? {
+        ignoreMs: 2000,
+        onlineMs: 4000,
+        typingMs: 3000,
+      };
+
+      await new Promise((r) => setTimeout(r, schedule.ignoreMs));
+      setLiveOnline(true);
+      await new Promise((r) => setTimeout(r, schedule.onlineMs));
+      setIsTyping(true);
+      await new Promise((r) => setTimeout(r, schedule.typingMs));
+      setIsTyping(false);
+
+      const segments = replyFull
+        .split(/\n{2,}/)
+        .map((str) => str.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+
+      const paceDelay = (tx: string) => Math.min(600 + tx.length * 25, 2800);
+
+      for (let i = 0; i < segments.length; i++) {
+        const seg = segments[i];
+        const aiMsg: Message = {
+          id: genId(),
+          role: 'assistant',
+          content: seg,
+          timestamp: new Date(),
+        };
+        setMessages((prev) => [...prev, aiMsg]);
+        saveMessage('assistant', seg);
+
+        if (i < segments.length - 1) {
+          setIsTyping(true);
+          await new Promise((r) => setTimeout(r, paceDelay(segments[i + 1])));
+          setIsTyping(false);
+          await new Promise((r) => setTimeout(r, 250));
+        }
+      }
+
+      setTimeout(() => setLiveOnline(false), 120_000);
+    } catch (err) {
+      console.error('[chat-ai] fallback triggered:', err);
+      const fallbackReplies: string[] = tr.chat.fallbackReplies;
+      const fallback =
+        fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
+
+      setLiveOnline(true);
+      setIsTyping(true);
+      await new Promise((r) => setTimeout(r, 1200));
+      setIsTyping(false);
+      const aiMsg: Message = {
+        id: genId(),
+        role: 'assistant',
+        content: fallback,
+        timestamp: new Date(),
+      };
+      setMessages((prev) => [...prev, aiMsg]);
+      saveMessage('assistant', fallback);
+      setTimeout(() => setLiveOnline(false), 30_000);
+    } finally {
+      setTimeout(() => setIsTyping(false), 400);
+    }
+  }, [currentGirl, session, user, t, tr, saveMessage]);
+
   /* ── Send message ── */
   const sendMessage = useCallback(
     async (text?: string) => {
@@ -480,138 +604,37 @@ export default function Chat() {
 
       saveMessage('user', content);
 
+      // Синхронно обновляем messagesRef, чтобы runAiTurn сразу видел этот бабл,
+      // даже если React ещё не успел прогнать эффект синхронизации.
+      messagesRef.current = [...messagesRef.current, userMsg];
+
+      // Если AI уже в процессе ответа (игнор/онлайн/печатает/сегменты) —
+      // НЕ стартуем параллельный fetch. Просто помечаем очередь:
+      // по завершении текущего цикла runAiTurn выполнится ещё раз с обновлённым контекстом.
+      if (inflightRef.current) {
+        queuedRef.current = true;
+        return;
+      }
+
       // Статус будет управляться расписанием с сервера:
       // фаза "игнор" (offline) → "в сети" (online) → "печатает" (typing) → ответ.
       setIsTyping(false);
       setLiveOnline(false);
 
+      inflightRef.current = true;
       try {
-        // Last 8 messages for context
-        const recent = [...messages, userMsg].slice(-8).map((m) => ({
-          role: m.role,
-          content: m.content,
-        }));
-
-        const res = await fetch(import.meta.env.VITE_EDGE_FUNCTION_URL, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session?.access_token}`,
-          },
-          body: JSON.stringify({
-            messages: recent,
-            girlId: currentGirl.id,
-            userId: user?.id,
-          }),
-        });
-
-        if (!res.ok) {
-          const errText = await res.text().catch(() => '');
-          console.error('[chat-ai] API error', res.status, errText);
-          throw new Error(`API error ${res.status}: ${errText}`);
-        }
-
-        const data = await res.json();
-
-        // Sleep-режим: девушка спит, сервер намеренно не ответил.
-        // Ничего не показываем — ни "онлайн", ни "печатает". Сообщение юзера
-        // остаётся, утром сработает проактивность ("привет, я спала...").
-        if (data?.skipped === 'sleep') {
-          console.log('[chat-ai] sleep-skip:', data?.local_time);
-          return;
-        }
-
-        const rawReply = data?.reply
-          ?? data?.choices?.[0]?.message?.content
-          ?? data?.content
-          ?? '';
-        const replyFull = (typeof rawReply === 'string' ? rawReply.trim() : '')
-          || t('chat.aiFallbackReply');
-
-        // Расписание показа: сервер даёт ignore/online/typing в мс.
-        // Fallback если по какой-то причине нет schedule: короткие дефолты.
-        const schedule = (data?.schedule as
-          | { ignoreMs: number; onlineMs: number; typingMs: number }
-          | undefined) ?? {
-          ignoreMs: 2000,
-          onlineMs: 4000,
-          typingMs: 3000,
-        };
-
-        // Фаза 1: "игнор" — статус offline, ничего не показываем.
-        await new Promise((r) => setTimeout(r, schedule.ignoreMs));
-
-        // Фаза 2: "в сети" — она увидела чат, думает как ответить.
-        setLiveOnline(true);
-        await new Promise((r) => setTimeout(r, schedule.onlineMs));
-
-        // Фаза 3: "печатает" — индикатор typing, всё ещё online.
-        setIsTyping(true);
-        await new Promise((r) => setTimeout(r, schedule.typingMs));
-        setIsTyping(false);
-
-        // Разбиваем на сегменты: модели разрешено слать несколько сообщений через \n\n.
-        // Отсекаем пустые, ограничиваем максимум 3 сегмента.
-        const segments = replyFull
-          .split(/\n{2,}/)
-          .map((s) => s.trim())
-          .filter(Boolean)
-          .slice(0, 3);
-
-        // Пауза между сегментами: зависит от длины следующего, имитирует набор текста.
-        const paceDelay = (text: string) =>
-          Math.min(600 + text.length * 25, 2800);
-
-        for (let i = 0; i < segments.length; i++) {
-          const seg = segments[i];
-
-          const aiMsg: Message = {
-            id: genId(),
-            role: 'assistant',
-            content: seg,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, aiMsg]);
-          saveMessage('assistant', seg);
-
-          // Перед следующим сегментом — короткая "печать"
-          if (i < segments.length - 1) {
-            setIsTyping(true);
-            await new Promise((r) => setTimeout(r, paceDelay(segments[i + 1])));
-            setIsTyping(false);
-            await new Promise((r) => setTimeout(r, 250));
-          }
-        }
-
-        // После ответа ещё ~2мин держим online, потом "была недавно".
-        setTimeout(() => setLiveOnline(false), 120_000);
-
-        const lastSeg = segments[segments.length - 1] ?? replyFull;
-        void lastSeg; // dialog preview removed in 1:1 model
-      } catch (err) {
-        console.error('[chat-ai] fallback triggered:', err);
-        const fallbackReplies: string[] = tr.chat.fallbackReplies;
-        const fallback = fallbackReplies[Math.floor(Math.random() * fallbackReplies.length)];
-
-        setLiveOnline(true);
-        setIsTyping(true);
-        setTimeout(() => {
-          setIsTyping(false);
-          const aiMsg: Message = {
-            id: genId(),
-            role: 'assistant',
-            content: fallback,
-            timestamp: new Date(),
-          };
-          setMessages((prev) => [...prev, aiMsg]);
-          saveMessage('assistant', fallback);
-          setTimeout(() => setLiveOnline(false), 30_000);
-        }, 1200);
+        do {
+          queuedRef.current = false;
+          // Маленькая пауза — даём возможным быстрым подарком/сообщениям
+          // успеть попасть в messagesRef до отправки.
+          await new Promise((r) => setTimeout(r, 250));
+          await runAiTurn();
+        } while (queuedRef.current);
       } finally {
-        setTimeout(() => setIsTyping(false), 400);
+        inflightRef.current = false;
       }
     },
-    [input, currentGirl, messages, session, saveMessage, messagesLeft, t, tr],
+    [input, currentGirl, saveMessage, messagesLeft, runAiTurn],
   );
 
   /* ── Enter to send ── */
