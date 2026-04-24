@@ -1,0 +1,165 @@
+/* ─── GiftPicker — bottom sheet ─── */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: var(--z-modal, 400);
+}
+
+.sheet {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: calc(var(--z-modal, 400) + 1);
+  background: var(--bg-card, #1E1A2E);
+  border-radius: 24px 24px 0 0;
+  border-top: 1px solid var(--border-subtle, rgba(139, 92, 246, 0.12));
+  padding: 20px 20px 32px;
+  max-height: 72vh;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+/* ─── Header ─── */
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-primary, #F8F7FF);
+}
+
+.closeBtn {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  border: none;
+  color: var(--text-secondary, #B8B3CC);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.closeBtn:hover {
+  background: rgba(255, 255, 255, 0.14);
+}
+
+/* ─── Balance hint ─── */
+
+.balanceHint {
+  font-size: 0.8rem;
+  color: var(--text-secondary, #B8B3CC);
+  text-align: right;
+}
+
+/* ─── Tabs ─── */
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+
+.tab {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 20px;
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid transparent;
+  color: var(--text-secondary, #B8B3CC);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.tabActive {
+  background: rgba(139, 92, 246, 0.18);
+  border-color: rgba(139, 92, 246, 0.4);
+  color: var(--accent-purple, #8B5CF6);
+}
+
+/* ─── Gift grid ─── */
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 12px 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  border-radius: 14px;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+
+.item:hover:not(:disabled) {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.3);
+  transform: translateY(-2px);
+}
+
+.item:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.itemDim {
+  opacity: 0.45;
+}
+
+.emoji {
+  font-size: 1.75rem;
+  line-height: 1;
+}
+
+.name {
+  font-size: 0.7rem;
+  color: var(--text-primary, #F8F7FF);
+  text-align: center;
+  line-height: 1.2;
+}
+
+.price {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #B8B3CC);
+  font-weight: 600;
+}
+
+/* ─── Misc ─── */
+
+.loadingRow {
+  text-align: center;
+  color: var(--text-secondary, #B8B3CC);
+  padding: 24px 0;
+  font-size: 0.875rem;
+}
+
+.error {
+  font-size: 0.8rem;
+  color: #f87171;
+  text-align: center;
+  margin: 0;
+}

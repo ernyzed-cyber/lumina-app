@@ -786,6 +786,28 @@ const en = {
     processing: 'Opening payment page...',
     error: 'Something went wrong. Try again.',
   },
+
+  /* ── Gifts ── */
+  gifts: {
+    open: 'Send a gift',
+    category: {
+      gift: 'Gifts',
+      jewelry: 'Jewelry',
+      date: 'Date',
+      travel: 'Travel',
+    },
+  },
+
+  /* ── Daily Limit Modal ── */
+  dailyLimit: {
+    title: 'Daily limit reached',
+    subtitle: 'Buy +100 messages to keep the conversation going',
+    buyMessages: 'Buy +100 messages',
+    topUpFirst: 'Top up stars first',
+    notEnough: 'Not enough stars',
+    need: 'You need ⭐ {n} more',
+    topUp: 'Top up stars',
+  },
 };
 
 export type Translations = typeof en;

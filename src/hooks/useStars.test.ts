@@ -128,3 +128,46 @@ describe('useStars – buyPack', () => {
     expect(result.current.loading).toBe(false);
   });
 });
+
+describe('useStars – buyMessagesPack', () => {
+  it('calls messages-buy-pack and refreshes balance on success', async () => {
+    mockInvoke.mockResolvedValue({ data: { ok: true, messages_bought: 100 }, error: null });
+
+    const { result } = renderHook(() => useStars());
+    await waitFor(() => expect(result.current.balance).toBe(150));
+
+    // Reset call count; simulate balance after spending 100⭐
+    mockInvoke.mockClear();
+    mockFrom.mockClear();
+    makeFromChain([{ amount: 50 }]);
+
+    await act(async () => { await result.current.buyMessagesPack(); });
+
+    expect(mockInvoke).toHaveBeenCalledWith('messages-buy-pack');
+    expect(result.current.balance).toBe(50);
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('sets error when messages-buy-pack returns an error', async () => {
+    mockInvoke.mockResolvedValue({ data: null, error: new Error('insufficient stars') });
+
+    const { result } = renderHook(() => useStars());
+    await act(async () => { await result.current.buyMessagesPack(); });
+
+    expect(result.current.error).toBe('insufficient stars');
+    expect(result.current.loading).toBe(false);
+  });
+
+  it('exposes refetch as an alias for fetchBalance', async () => {
+    const { result } = renderHook(() => useStars());
+    await waitFor(() => expect(result.current.balance).toBe(150));
+
+    mockFrom.mockClear();
+    makeFromChain([{ amount: 200 }]);
+
+    await act(async () => { await result.current.refetch(); });
+
+    expect(result.current.balance).toBe(200);
+  });
+});

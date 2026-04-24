@@ -71,5 +71,28 @@ export function useStars() {
     }
   }, []);
 
-  return { balance, loading, error, fetchBalance, buyPack };
+  /**
+   * Spend 100⭐ to buy +100 messages for today.
+   * Invokes `messages-buy-pack` edge function (no body needed).
+   * Balance is refreshed automatically on success.
+   */
+  const buyMessagesPack = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { error: fnError } = await supabase.functions.invoke('messages-buy-pack');
+      if (fnError) {
+        tg.haptic('error');
+        throw fnError;
+      }
+      tg.haptic('success');
+      await fetchBalance();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Unknown error');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchBalance]);
+
+  return { balance, loading, error, fetchBalance, refetch: fetchBalance, buyPack, buyMessagesPack };
 }

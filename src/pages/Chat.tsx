@@ -20,7 +20,8 @@ import { Button } from '../components/ui/Button';
 import PageTransition from '../components/layout/PageTransition';
 import Navbar from '../components/layout/Navbar';
 import EmptyState from '../components/ui/EmptyState';
-import { Paywall } from '../components/Paywall';
+import { GiftPicker } from '../components/GiftPicker';
+import { DailyLimitModal } from '../components/DailyLimitModal';
 import GirlProfileDrawer, { type GirlProfileLabels } from '../components/GirlProfile/GirlProfileDrawer';
 import { useLanguage } from '../i18n';
 import { useTelegramVerified } from '../hooks/useTelegramVerified';
@@ -115,7 +116,7 @@ export default function Chat() {
   const { resetMessages } = useNotifications();
   const navigate = useNavigate();
   const { activeGirlId, loading: assignmentLoading } = useAssignment();
-  const { balance: starsBalance } = useStars();
+  const { balance: starsBalance, refetch: refetchStars } = useStars();
 
   /* ── Localized girls data ── */
   // (Removed: in 1:1 model we only need the active girl, not the full list)
@@ -218,7 +219,6 @@ export default function Chat() {
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
-  const giftPickerRef = useRef<HTMLDivElement>(null);
   // Мьютекс против двойного ответа. Пока идёт текущий AI-цикл (fetch+schedule+сегменты),
   // новые sendMessage добавляют user-бабл но НЕ стартуют параллельный fetch.
   // По завершении цикла, если флаг выставлен — делаем ещё один цикл с обновлённым контекстом.
@@ -227,8 +227,13 @@ export default function Chat() {
   const messagesRef = useRef<Message[]>([]);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
-  const [giftOpen, setGiftOpen] = useState(false);
-  const [paywallOpen, setPaywallOpen] = useState(false);
+  const [giftPickerOpen, setGiftPickerOpen] = useState(false);
+  const [limitModal, setLimitModal] = useState<{
+    open: boolean;
+    variant: 'daily_limit' | 'insufficient_stars';
+    neededStars?: number;
+    inCharacterMessage?: string;
+  }>({ open: false, variant: 'daily_limit' });
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [showScrollBtn, setShowScrollBtn] = useState(false);
 
@@ -402,18 +407,6 @@ export default function Chat() {
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [emojiOpen]);
 
-  /* ── Close gift picker on click outside ── */
-  useEffect(() => {
-    if (!giftOpen) return;
-    function handleClickOutside(e: MouseEvent) {
-      if (giftPickerRef.current && !giftPickerRef.current.contains(e.target as Node)) {
-        setGiftOpen(false);
-      }
-    }
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, [giftOpen]);
-
   /* ── Persist message limits ── */
   useEffect(() => {
     storage.save(MSG_LIMIT_KEY, msgLimits);
@@ -486,6 +479,16 @@ export default function Chat() {
           userId: user?.id,
         }),
       });
+
+      if (res.status === 429) {
+        const body = await res.json().catch(() => ({}));
+        setLimitModal({
+          open: true,
+          variant: 'daily_limit',
+          inCharacterMessage: body?.in_character_message as string | undefined,
+        });
+        return;
+      }
 
       if (!res.ok) {
         const errText = await res.text().catch(() => '');
@@ -584,7 +587,7 @@ export default function Chat() {
 
       // Check daily limit
       if (messagesLeft <= 0) {
-        setPaywallOpen(true);
+        setLimitModal({ open: true, variant: 'daily_limit' });
         return;
       }
 
@@ -647,15 +650,6 @@ export default function Chat() {
         e.preventDefault();
         sendMessage();
       }
-    },
-    [sendMessage],
-  );
-
-  /* ── Send gift as special message ── */
-  const sendGift = useCallback(
-    (giftId: string) => {
-      setGiftOpen(false);
-      sendMessage(`[GIFT:${giftId}]`);
     },
     [sendMessage],
   );
@@ -945,43 +939,14 @@ export default function Chat() {
                   </AnimatePresence>
                 </div>
 
-                <div className={s.giftWrap} ref={giftPickerRef}>
-                  <button
-                    className={`${s.giftBtn} ${giftOpen ? s.giftBtnActive : ''}`}
-                    onClick={() => { setGiftOpen((v) => !v); setEmojiOpen(false); }}
-                    aria-label={t('chat.giftAriaLabel')}
-                    aria-expanded={giftOpen}
+                <button
+                    className={s.giftBtn}
+                    onClick={() => { setGiftPickerOpen(true); setEmojiOpen(false); }}
+                    aria-label={t('gifts.open')}
+                    type="button"
                   >
                     <Gift size={22} />
                   </button>
-
-                  <AnimatePresence>
-                    {giftOpen && (
-                      <motion.div
-                        className={s.giftPicker}
-                        initial={{ opacity: 0, y: 10, scale: 0.95 }}
-                        animate={{ opacity: 1, y: 0, scale: 1 }}
-                        exit={{ opacity: 0, y: 10, scale: 0.95 }}
-                        transition={{ duration: 0.2 }}
-                      >
-                        <div className={s.giftPickerTitle}>{t('chat.giftPickerTitle')}</div>
-                        <div className={s.giftGrid}>
-                          {GIFT_ITEMS.map((gift) => (
-                            <button
-                              key={gift.id}
-                              className={s.giftItem}
-                              onClick={() => sendGift(gift.id)}
-                              type="button"
-                            >
-                              <span className={s.giftItemEmoji}>{gift.emoji}</span>
-                              <span className={s.giftItemName}>{t(`profile.gifts.${gift.id}`)}</span>
-                            </button>
-                          ))}
-                        </div>
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-                </div>
 
                 <div className={s.textareaWrap}>
                   <textarea
@@ -1082,11 +1047,23 @@ export default function Chat() {
       )}
     </div>
 
-      <Paywall
-        isOpen={paywallOpen}
-        onClose={() => setPaywallOpen(false)}
-        type="messages"
+      <DailyLimitModal
+        open={limitModal.open}
+        variant={limitModal.variant}
+        neededStars={limitModal.neededStars}
+        inCharacterMessage={limitModal.inCharacterMessage}
+        onClose={() => setLimitModal((s) => ({ ...s, open: false }))}
+        onBought={() => setMsgLimits({ count: 0, date: new Date().toISOString().slice(0, 10) })}
       />
+
+      {currentGirl && (
+        <GiftPicker
+          open={giftPickerOpen}
+          girlId={currentGirl.id}
+          onClose={() => setGiftPickerOpen(false)}
+          onSent={() => { void refetchStars(); }}
+        />
+      )}
 
       <GirlProfileDrawer
         open={drawerOpen}
