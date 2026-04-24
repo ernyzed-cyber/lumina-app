@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo, type KeyboardEvent, type ChangeEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion, AnimatePresence } from 'framer-motion';
-import {
+import { motion, AnimatePresence } from 'framer-motion';import {
   Info,
   Smile,
   Send,
@@ -25,6 +24,8 @@ import { Paywall } from '../components/Paywall';
 import GirlProfileDrawer, { type GirlProfileLabels } from '../components/GirlProfile/GirlProfileDrawer';
 import { useLanguage } from '../i18n';
 import { useTelegramVerified } from '../hooks/useTelegramVerified';
+import { useStars } from '../hooks/useStars';
+import { StarsBalance } from '../components/StarsBalance';
 import VerificationModal from '../components/VerificationModal';
 import s from './Chat.module.css';
 
@@ -114,6 +115,7 @@ export default function Chat() {
   const { resetMessages } = useNotifications();
   const navigate = useNavigate();
   const { activeGirlId, loading: assignmentLoading } = useAssignment();
+  const { balance: starsBalance } = useStars();
 
   /* ── Localized girls data ── */
   // (Removed: in 1:1 model we only need the active girl, not the full list)
@@ -737,6 +739,7 @@ export default function Chat() {
             </div>
 
             <div className={s.chatHeaderActions}>
+              <StarsBalance balance={starsBalance} onClick={() => navigate('/shop')} />
               <button
                 className={`${s.headerBtn} ${profileOpen ? s.headerBtnActive : ''}`}
                 onClick={() => setProfileOpen((v) => !v)}

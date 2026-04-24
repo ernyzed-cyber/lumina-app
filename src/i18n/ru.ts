@@ -776,6 +776,18 @@ const ru: Translations = {
     promoViews: 'Активируй гарантированные показы — получи больше лайков',
     promoViewsBtn: 'Активировать',
   },
+
+  /* ── Shop (покупка звёзд) ── */
+  shop: {
+    title: 'Купить звёзды',
+    subtitle: 'Звёзды — топливо ваших чатов и подарков',
+    balance: 'Ваш баланс',
+    buy: 'Купить',
+    bonus: 'бонус',
+    footnote: 'Оплата через CryptoCloud. Цены в USD.',
+    processing: 'Открываем страницу оплаты...',
+    error: 'Что-то пошло не так. Попробуйте ещё раз.',
+  },
 } as const;
 
 export default ru;

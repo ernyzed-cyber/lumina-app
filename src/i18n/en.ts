@@ -774,6 +774,18 @@ const en = {
     promoViews: 'Activate guaranteed impressions — get more likes',
     promoViewsBtn: 'Activate',
   },
+
+  /* ── Shop (Stars purchase) ── */
+  shop: {
+    title: 'Buy Stars',
+    subtitle: 'Stars power your chats and gifts',
+    balance: 'Your balance',
+    buy: 'Buy',
+    bonus: 'bonus',
+    footnote: 'Payment via CryptoCloud. Prices in USD.',
+    processing: 'Opening payment page...',
+    error: 'Something went wrong. Try again.',
+  },
 };
 
 export type Translations = typeof en;
