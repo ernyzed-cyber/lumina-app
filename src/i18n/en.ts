@@ -627,10 +627,6 @@ const en = {
     },
     toast: {
       comingSoon: 'Payment integration coming soon!',
-      devActivated: 'Premium activated (dev mode)',
-    },
-    dev: {
-      activateBtn: 'DEV: Activate Premium',
     },
     backToProfile: 'Back to profile',
   },

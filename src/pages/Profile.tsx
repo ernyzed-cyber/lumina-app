@@ -12,7 +12,6 @@ import {
   Home,
   ChevronRight,
   Plus,
-  Crown,
   Lock,
   AlertTriangle,
   Trash2,
@@ -37,7 +36,6 @@ import { supabase } from '../lib/supabase';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useLanguage } from '../i18n';
-import { usePremium } from '../hooks/usePremium';
 import { useMyProfile } from '../hooks/useMyProfile';
 import { storage } from '../utils/helpers';
 import s from './Profile.module.css';
@@ -262,7 +260,6 @@ export default function Profile() {
   const { showToast, ToastContainer } = useToast();
   const navigate = useNavigate();
   const { t } = useLanguage();
-  const { isPremium } = usePremium();
   const { avatarUrl: myAvatar, setAvatarUrl: setMyAvatar, setPhotos: setMyPhotos } = useMyProfile();
 
   /* ── State ── */
@@ -771,17 +768,6 @@ export default function Profile() {
               />
             ))}
           </div>
-
-          {/* ════════ VIP Banner ════════ */}
-          {!isPremium && (
-            <button
-              className={s.vipBanner}
-              onClick={() => navigate('/premium')}
-            >
-              <Crown size={20} className={s.vipIcon} />
-              <span className={s.vipText}>Lumina VIP</span>
-            </button>
-          )}
 
           {/* ════════ Photo Grid ════════ */}
           <input

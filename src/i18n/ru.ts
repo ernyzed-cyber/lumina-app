@@ -629,10 +629,6 @@ const ru: Translations = {
     },
     toast: {
       comingSoon: 'Интеграция оплаты скоро появится!',
-      devActivated: 'Premium активирован (dev-режим)',
-    },
-    dev: {
-      activateBtn: 'DEV: Активировать Premium',
     },
     backToProfile: 'Назад в профиль',
   },

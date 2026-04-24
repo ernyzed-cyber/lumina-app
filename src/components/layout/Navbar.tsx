@@ -63,7 +63,7 @@ export default function Navbar({
       labelKey: 'navbar.notifications',
       badge: notificationsBadge,
     },
-    { to: '/premium', icon: <Crown size={22} />, labelKey: 'navbar.premium', premium: true },
+    { to: '/shop', icon: <Crown size={22} />, labelKey: 'navbar.premium', premium: true },
     { to: '/profile', icon: <User size={22} />, labelKey: 'navbar.profile' },
     { to: '/settings', icon: <Settings size={22} />, labelKey: 'navbar.settings' },
   ];

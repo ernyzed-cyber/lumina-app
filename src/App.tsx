@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { Routes, Route } from 'react-router-dom';
 import { ProtectedRoute } from './components/layout/ProtectedRoute';
 import NotificationBanner from './components/NotificationBanner';
@@ -17,6 +17,7 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
 const Shop = lazy(() => import('./pages/Shop'));
+const Premium = lazy(() => import('./pages/Premium'));
 const Waitlist = lazy(() => import('./pages/Waitlist'));
 const Released = lazy(() => import('./pages/Released'));
 
@@ -49,6 +50,11 @@ function PageLoader() {
 function App() {
   const { t } = useLanguage();
 
+  // One-time migration: clear legacy premium localStorage key
+  useEffect(() => {
+    localStorage.removeItem('lumina_premium');
+  }, []);
+
   return (
     <Suspense fallback={<PageLoader />}>
       <a href="#main-content" className="skip-to-content">
@@ -72,6 +78,7 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/shop" element={<Shop />} />
+          <Route path="/premium" element={<Premium />} />
           <Route path="/waitlist" element={<Waitlist />} />
           <Route path="/released" element={<Released />} />
         </Route>

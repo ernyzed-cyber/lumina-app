@@ -16,7 +16,6 @@ import {
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import PageTransition from '../components/layout/PageTransition';
-import { Paywall } from '../components/Paywall';
 import FilterPanel from '../components/filters/FilterPanel';
 import GirlProfileDrawer, { type GirlProfileLabels } from '../components/GirlProfile/GirlProfileDrawer';
 import { useAuth } from '../hooks/useAuth';
@@ -27,42 +26,17 @@ import { getLocalizedGirls, type Girl } from '../data/girls';
 import type { FilterState } from '../types/filters';
 import { DEFAULT_FILTERS } from '../types/filters';
 import { storage } from '../utils/helpers';
-import { supabase } from '../lib/supabase';
 import VerificationModal from '../components/VerificationModal';
 import s from './Feed.module.css';
 
 /* ── Constants ── */
-const DAILY_LIKE_LIMIT = 5;
-const DAILY_SUPERLIKE_LIMIT = 1;
 const SWIPE_THRESHOLD = 120;
 const SWIPE_UP_THRESHOLD = 100;
 const ROTATION_FACTOR = 15;
 const MATCH_DELAY_MIN = 2000;
 const MATCH_DELAY_MAX = 5000;
 
-const STORAGE_KEY = 'likedGirls';
-const LIMITS_KEY = 'dailyLimits';
 const FILTERS_KEY = 'feedFilters';
-
-interface DailyLimits {
-  likes: number;
-  superLikes: number;
-  date: string;
-}
-
-function getTodayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function getDefaultLimits(): DailyLimits {
-  return { likes: 0, superLikes: 0, date: getTodayStr() };
-}
-
-function loadLimits(): DailyLimits {
-  const saved = storage.load<DailyLimits>(LIMITS_KEY, null);
-  if (!saved || saved.date !== getTodayStr()) return getDefaultLimits();
-  return saved;
-}
 
 /* ── Filter matching ── */
 function matchesFilters(girl: Girl, f: FilterState): boolean {
@@ -346,10 +320,6 @@ export default function Feed() {
 
   /* Card stack */
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [likedIds, setLikedIds] = useState<string[]>(() =>
-    storage.load<string[]>(STORAGE_KEY, []) ?? [],
-  );
-  const [limits, setLimits] = useState<DailyLimits>(loadLimits);
 
   /* Match animation */
   const [matchGirl, setMatchGirl] = useState<Girl | null>(null);
@@ -357,13 +327,8 @@ export default function Feed() {
   /* Button-triggered swipe */
   const [triggerSwipe, setTriggerSwipe] = useState<'left' | 'right' | 'up' | null>(null);
 
-  /* Paywall modal */
-  const [paywallType, setPaywallType] = useState<'likes' | 'superLikes' | null>(null);
-
   /* Verification modal */
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
-
-  const likeSyncedRef = useRef(false);
 
   /* Reset index when filters change */
   useEffect(() => {
@@ -372,46 +337,10 @@ export default function Feed() {
 
   /* ── Auth guard handled by ProtectedRoute — no duplicate needed ── */
 
-  /* ── Load likes from Supabase ── */
-  useEffect(() => {
-    if (!user || likeSyncedRef.current) return;
-    likeSyncedRef.current = true;
-
-    (async () => {
-      try {
-        const { data, error } = await supabase
-          .from('likes')
-          .select('girl_id')
-          .eq('user_id', user.id);
-
-        if (!error && data && data.length > 0) {
-          const ids = data.map((r: { girl_id: string }) => r.girl_id);
-          setLikedIds(ids);
-          storage.save(STORAGE_KEY, ids);
-        }
-      } catch {
-        // Fallback: use localStorage
-      }
-    })();
-  }, [user]);
-
-  /* ── Persist limits ── */
-  useEffect(() => {
-    storage.save(LIMITS_KEY, limits);
-  }, [limits]);
-
-  /* ── Persist likes ── */
-  useEffect(() => {
-    storage.save(STORAGE_KEY, likedIds);
-  }, [likedIds]);
-
   /* ── Remaining cards ── */
   const remainingGirls = girls.slice(currentIndex);
   const topTwo = remainingGirls.slice(0, 2);
   const isOutOfCards = remainingGirls.length === 0;
-
-  const likesLeft = DAILY_LIKE_LIMIT - limits.likes;
-  const superLikesLeft = DAILY_SUPERLIKE_LIMIT - limits.superLikes;
 
   /* ── Handle swipe ── */
   const handleSwipe = useCallback(
@@ -424,22 +353,14 @@ export default function Feed() {
         return;
       }
 
-      if (dir === 'right') {
-        if (likesLeft <= 0) {
-          setPaywallType('likes');
-          return;
-        }
-        setLimits((prev) => ({ ...prev, likes: prev.likes + 1 }));
-
-        // Создаём assignment вместо syncLike
+      if (dir === 'right' || dir === 'up') {
+        // Создаём assignment
         const { error: aError } = await createAssignment(girl.id);
         if (aError === 'girl_taken') {
-          // Девушку только что забрал другой юзер — просто убираем карточку
           setCurrentIndex((prev) => prev + 1);
           return;
         }
         if (!aError) {
-          // Успешно! Показываем match-анимацию, потом редиректим
           const delay = MATCH_DELAY_MIN + Math.random() * (MATCH_DELAY_MAX - MATCH_DELAY_MIN);
           setTimeout(() => {
             setMatchGirl(girl);
@@ -447,27 +368,9 @@ export default function Feed() {
         }
       }
 
-      if (dir === 'up') {
-        if (superLikesLeft <= 0) {
-          setPaywallType('superLikes');
-          return;
-        }
-        setLimits((prev) => ({ ...prev, superLikes: prev.superLikes + 1 }));
-
-        // Создаём assignment (superlike тоже выбирает девушку)
-        const { error: aError } = await createAssignment(girl.id);
-        if (aError === 'girl_taken') {
-          setCurrentIndex((prev) => prev + 1);
-          return;
-        }
-        if (!aError) {
-          setTimeout(() => setMatchGirl(girl), 1500);
-        }
-      }
-
       setCurrentIndex((prev) => prev + 1);
     },
-    [currentIndex, likesLeft, superLikesLeft, createAssignment, girls, telegramVerified],
+    [currentIndex, createAssignment, girls, telegramVerified],
   );
 
   /* ── Reset deck ── */
@@ -740,8 +643,6 @@ export default function Feed() {
                       const girl = girls[currentIndex];
                       if (!girl) return;
                       if (telegramVerified === false) return;
-                      if (likesLeft <= 0) { setPaywallType('likes'); return; }
-                      setLimits((prev) => ({ ...prev, likes: prev.likes + 1 }));
                       const { error: aError } = await createAssignment(girl.id);
                       if (!aError) navigate('/chat', { replace: true });
                       else if (aError === 'girl_taken') setCurrentIndex((prev) => prev + 1);
@@ -757,9 +658,9 @@ export default function Feed() {
                     className={`${s.actionBtn} ${s.actionBtnLike}`}
                     onClick={() => {
                       if (telegramVerified === false) return;
-                      if (likesLeft > 0) setTriggerSwipe('right');
+                      setTriggerSwipe('right');
                     }}
-                    disabled={likesLeft <= 0 || telegramVerified === false}
+                    disabled={telegramVerified === false}
                     aria-label={t('feed.likeAriaLabel')}
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.85 }}
                     whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
@@ -772,9 +673,9 @@ export default function Feed() {
                     className={`${s.actionBtn} ${s.actionBtnFire}`}
                     onClick={() => {
                       if (telegramVerified === false) return;
-                      if (superLikesLeft > 0) setTriggerSwipe('up');
+                      setTriggerSwipe('up');
                     }}
-                    disabled={superLikesLeft <= 0 || telegramVerified === false}
+                    disabled={telegramVerified === false}
                     aria-label={t('feed.superLikeAriaLabel')}
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.85 }}
                     whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
@@ -789,9 +690,6 @@ export default function Feed() {
                       </defs>
                       <path d="M12 2c.5 4-2 6-2 10 0 2.5 2 4 4 4s4-1.5 4-4c0-6-6-10-6-10zm-2 16c-1.5 0-3-1-3-3 0-2 1.5-3 3-4 1.5 1 3 2 3 4s-1.5 3-3 3z" />
                     </svg>
-                    {superLikesLeft > 0 && (
-                      <span className={s.actionBadge}>{superLikesLeft}</span>
-                    )}
                   </motion.button>
                 </div>
               )}
@@ -851,13 +749,6 @@ export default function Feed() {
           )}
         </AnimatePresence>
 
-        {/* ── Paywall Modal ── */}
-        <Paywall
-          isOpen={paywallType !== null}
-          onClose={() => setPaywallType(null)}
-          type={paywallType ?? 'likes'}
-        />
-
         {/* ── Verification Modal ── */}
         <VerificationModal
           open={verifyModalOpen}
@@ -889,12 +780,6 @@ export default function Feed() {
               setVerifyModalOpen(true);
               return;
             }
-            if (likesLeft <= 0) {
-              setPaywallType('likes');
-              closeDrawer();
-              return;
-            }
-            setLimits((prev) => ({ ...prev, likes: prev.likes + 1 }));
             const { error: aError } = await createAssignment(g.id);
             closeDrawer();
             if (!aError) {
@@ -908,12 +793,6 @@ export default function Feed() {
               setVerifyModalOpen(true);
               return;
             }
-            if (superLikesLeft <= 0) {
-              setPaywallType('superLikes');
-              closeDrawer();
-              return;
-            }
-            setLimits((prev) => ({ ...prev, superLikes: prev.superLikes + 1 }));
             const { error: aError } = await createAssignment(g.id);
             closeDrawer();
             if (!aError) {

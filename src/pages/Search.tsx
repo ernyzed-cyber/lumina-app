@@ -309,7 +309,7 @@ export default function Search() {
                       <div
                         key={`promo-${item.variant}`}
                         className={`${s.promoCard} ${isBoost ? s.promoCardPink : s.promoCardPurple}`}
-                        onClick={() => navigate('/premium')}
+                        onClick={() => navigate('/shop')}
                         role="button"
                         tabIndex={0}
                       >

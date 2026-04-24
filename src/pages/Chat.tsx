@@ -53,29 +53,6 @@ const EMOJI_DATA: { key: string; emojis: string[] }[] = [
   { key: 'love', emojis: ['💗', '💖', '💘', '💝', '💓', '💞', '♥️', '🫀', '😻', '💑', '🌹', '🌸', '🦋', '🍓', '🍒', '🍑'] },
 ];
 
-/* ── Gift items for chat gift picker ── */
-const GIFT_ITEMS = [
-  { id: 'rose', emoji: '\u{1F339}' },
-  { id: 'heart', emoji: '\u{2764}\u{FE0F}' },
-  { id: 'star', emoji: '\u{2B50}' },
-  { id: 'diamond', emoji: '\u{1F48E}' },
-  { id: 'teddy', emoji: '\u{1F9F8}' },
-  { id: 'chocolate', emoji: '\u{1F36B}' },
-  { id: 'ring', emoji: '\u{1F48D}' },
-  { id: 'kiss', emoji: '\u{1F48B}' },
-] as const;
-
-/** Check if a message is a gift message */
-const GIFT_PREFIX = '[GIFT:';
-function parseGiftMessage(content: string): { id: string; emoji: string } | null {
-  if (!content.startsWith(GIFT_PREFIX)) return null;
-  const endIdx = content.indexOf(']');
-  if (endIdx === -1) return null;
-  const giftId = content.slice(GIFT_PREFIX.length, endIdx);
-  const gift = GIFT_ITEMS.find((g) => g.id === giftId);
-  return gift ? { id: gift.id, emoji: gift.emoji } : null;
-}
-
 /* ── Helpers ── */
 function genId(): string {
   return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
@@ -777,7 +754,6 @@ export default function Chat() {
 
               <AnimatePresence initial={false}>
                 {messages.map((msg, i) => {
-                  const giftData = parseGiftMessage(msg.content);
                   return (
                   <div key={msg.id}>
                     {/* Date separator */}
@@ -795,13 +771,6 @@ export default function Chat() {
                       animate={{ opacity: 1, y: 0, scale: 1 }}
                       transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                     >
-                      {giftData ? (
-                        <div className={`${s.messageBubble} ${s.messageBubbleGift}`}>
-                          <span className={s.giftBubbleEmoji}>{giftData.emoji}</span>
-                          <span className={s.giftBubbleLabel}>{t('chat.giftSent')}</span>
-                          <div className={s.messageTime}>{formatTime(msg.timestamp)}</div>
-                        </div>
-                      ) : (
                       <div
                         className={`${s.messageBubble} ${
                           msg.role === 'user' ? s.messageBubbleUser : s.messageBubbleGirl
@@ -810,7 +779,6 @@ export default function Chat() {
                         <p className={s.messageText}>{msg.content}</p>
                         <div className={s.messageTime}>{formatTime(msg.timestamp)}</div>
                       </div>
-                      )}
                     </motion.div>
                   </div>
                   );
