@@ -30,9 +30,11 @@ export function DailyLimitModal({
   const canAfford = balance >= PACK_COST;
 
   async function handleBuy() {
-    await buyMessagesPack();
-    onBought?.();
-    onClose();
+    const ok = await buyMessagesPack();
+    if (ok) {
+      onBought?.();
+      onClose();
+    }
   }
 
   function handleTopUp() {

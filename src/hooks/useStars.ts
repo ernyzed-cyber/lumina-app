@@ -76,7 +76,7 @@ export function useStars() {
    * Invokes `messages-buy-pack` edge function (no body needed).
    * Balance is refreshed automatically on success.
    */
-  const buyMessagesPack = useCallback(async () => {
+  const buyMessagesPack = useCallback(async (): Promise<boolean> => {
     setLoading(true);
     setError(null);
     try {
@@ -87,8 +87,10 @@ export function useStars() {
       }
       tg.haptic('success');
       await fetchBalance();
+      return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
+      return false;
     } finally {
       setLoading(false);
     }

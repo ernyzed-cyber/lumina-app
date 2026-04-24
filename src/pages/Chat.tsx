@@ -1021,7 +1021,10 @@ export default function Chat() {
         neededStars={limitModal.neededStars}
         inCharacterMessage={limitModal.inCharacterMessage}
         onClose={() => setLimitModal((s) => ({ ...s, open: false }))}
-        onBought={() => setMsgLimits({ count: 0, date: new Date().toISOString().slice(0, 10) })}
+        onBought={() => {
+          setMsgLimits({ count: 0, date: new Date().toISOString().slice(0, 10) });
+          void refetchStars();
+        }}
       />
 
       {currentGirl && (
@@ -1029,7 +1032,7 @@ export default function Chat() {
           open={giftPickerOpen}
           girlId={currentGirl.id}
           onClose={() => setGiftPickerOpen(false)}
-          onSent={() => { void refetchStars(); }}
+          onSent={() => { setTimeout(() => void refetchStars(), 1200); }}
         />
       )}
 
