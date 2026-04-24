@@ -22,7 +22,7 @@ export function DailyLimitModal({
   onClose,
   onBought,
 }: Props) {
-  const { t, tr } = useLanguage();
+  const { t } = useLanguage();
   const navigate = useNavigate();
   const { balance, loading, buyMessagesPack } = useStars();
 
