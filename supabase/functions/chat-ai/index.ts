@@ -9,6 +9,8 @@
 //   SUPABASE_SERVICE_ROLE_KEY -- автоматически
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { decideLimit, nextResetAt } from './limit.ts';
+import { buildIntimacyBlock, buildGiftMemoriesBlock, buildSceneDirectiveBlock } from './prompt-injections.ts';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -20,6 +22,7 @@ interface RequestPayload {
   girlId?: string;
   userId?: string;
   system_prompt?: string;
+  lang?: 'ru' | 'en';
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -443,7 +446,52 @@ Deno.serve(async (req: Request) => {
     let dayMode: DayMode = 'rest';
 
     if (girlId && userId) {
-      const [personaRes, profileRes, memoriesRes] = await Promise.all([
+      const lang: 'ru' | 'en' = body.lang === 'en' ? 'en' : 'ru';
+
+      // ── Daily limit gate ─────────────────────────────────────────────────
+      const { data: limitProfile } = await supabase
+        .from('profiles')
+        .select('messages_used_today, messages_bought_today, messages_reset_at, tz_offset_minutes')
+        .eq('id', userId)
+        .single();
+
+      const snap = {
+        messages_used_today: (limitProfile?.messages_used_today as number) ?? 0,
+        messages_bought_today: (limitProfile?.messages_bought_today as number) ?? 0,
+        messages_reset_at: (limitProfile?.messages_reset_at as string | null) ?? null,
+        tz_offset_minutes: (limitProfile?.tz_offset_minutes as number) ?? 0,
+      };
+      const now = new Date();
+      const decision = decideLimit(snap, now);
+
+      if (decision.reset_needed) {
+        await supabase.from('profiles').update({
+          messages_used_today: 0,
+          messages_bought_today: 0,
+          messages_reset_at: nextResetAt(snap.tz_offset_minutes, now),
+        }).eq('id', userId);
+        snap.messages_used_today = 0;
+        snap.messages_bought_today = 0;
+      }
+
+      if (!decision.allowed) {
+        const limitMessages = {
+          ru: 'бли-ин, убегаю… столько всего сегодня. напишу завтра утром, окей? ❤️',
+          en: "argh, gotta run… so much going on today. i'll text tomorrow morning, okay? ❤️",
+        };
+        return new Response(JSON.stringify({
+          error: 'daily_limit',
+          in_character_message: limitMessages[lang],
+          remaining: 0,
+          quota: decision.quota,
+        }), { status: 429, headers: { ...CORS_HEADERS, 'Content-Type': 'application/json' } });
+      }
+
+      // Increment usage BEFORE Grok call so parallel requests can't exceed quota.
+      await supabase.rpc('increment_messages_used', { p_user_id: userId });
+      // ─────────────────────────────────────────────────────────────────────
+
+      const [personaRes, profileRes, memoriesRes, giftMemRes, relRes] = await Promise.all([
         supabase
           .from('girl_personas')
           .select('system_prompt, name, timezone, city')
@@ -455,8 +503,23 @@ Deno.serve(async (req: Request) => {
           .select('summary, created_at')
           .eq('girl_id', girlId)
           .eq('user_id', userId)
+          .is('gift_ref', null)
           .order('created_at', { ascending: false })
           .limit(MEMORY_LIMIT),
+        supabase
+          .from('memories')
+          .select('summary, gift_ref, intimacy_weight, created_at')
+          .eq('user_id', userId)
+          .eq('girl_id', girlId)
+          .not('gift_ref', 'is', null)
+          .order('intimacy_weight', { ascending: false })
+          .limit(5),
+        supabase
+          .from('girl_relationships')
+          .select('intimacy_level, pending_scene_marker')
+          .eq('user_id', userId)
+          .eq('girl_id', girlId)
+          .maybeSingle(),
       ]);
 
       const personaPrompt = personaRes.data?.system_prompt;
@@ -527,6 +590,25 @@ Deno.serve(async (req: Request) => {
           '━━━ FINAL REMINDER ━━━',
           `Your city is ${city}. Your local time is ${localTime.human}. Use these exact values if asked.`,
         ].join('\n');
+
+        // ── Intimacy / gift-memory / scene injections ──────────────────────
+        const intimacyLevel = (relRes.data?.intimacy_level as number) ?? 0;
+        const sceneMarker = (relRes.data?.pending_scene_marker as string | null) ?? null;
+        const injections = [
+          buildIntimacyBlock(intimacyLevel, lang),
+          buildGiftMemoriesBlock((giftMemRes.data ?? []) as Parameters<typeof buildGiftMemoriesBlock>[0], lang),
+          buildSceneDirectiveBlock(sceneMarker, lang),
+        ].filter(Boolean).join('\n\n');
+        if (injections) systemPrompt = `${systemPrompt}\n\n${injections}`;
+
+        // Consume scene marker so it fires only once.
+        if (sceneMarker) {
+          await supabase.from('girl_relationships').update({
+            pending_scene_marker: null,
+            pending_scene_expires_at: null,
+          }).eq('user_id', userId).eq('girl_id', girlId);
+        }
+        // ──────────────────────────────────────────────────────────────────
       } else if (legacyPrompt) {
         systemPrompt = legacyPrompt;
       } else {
