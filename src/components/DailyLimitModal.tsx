@@ -70,7 +70,7 @@ export function DailyLimitModal({
 
             {variant === 'insufficient_stars' && neededStars != null && (
               <p className={s.needMore}>
-                {tr('dailyLimit.need', { n: String(neededStars) })}
+                {t('dailyLimit.need', { n: String(neededStars) })}
               </p>
             )}
 

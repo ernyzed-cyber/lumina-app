@@ -868,7 +868,7 @@ export default function Chat() {
                 <div className={s.emojiWrap} ref={emojiPickerRef}>
                   <button
                     className={`${s.emojiBtn} ${emojiOpen ? s.emojiBtnActive : ''}`}
-                    onClick={() => { setEmojiOpen((v) => !v); setGiftOpen(false); }}
+                    onClick={() => { setEmojiOpen((v) => !v); }}
                     aria-label={t('chat.emojiAriaLabel')}
                     aria-expanded={emojiOpen}
                   >
