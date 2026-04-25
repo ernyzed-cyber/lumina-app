@@ -1,3 +1,5 @@
+import s from './StarsBalance.module.css';
+
 interface Props {
   balance: number;
   onClick?: () => void;
@@ -9,9 +11,11 @@ export function StarsBalance({ balance, onClick }: Props) {
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-500/15 border border-amber-400/30 text-amber-300 text-sm font-semibold hover:bg-amber-500/25 active:scale-95 transition"
+      className={s.chip}
+      aria-label={`${balance} stars`}
     >
-      ⭐ {balance.toLocaleString()}
+      <span className={s.star} aria-hidden="true">⭐</span>
+      <span className={s.value}>{balance.toLocaleString()}</span>
     </button>
   );
 }

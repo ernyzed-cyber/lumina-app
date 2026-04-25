@@ -6,7 +6,7 @@ import {
   Bell,
   User,
   Settings,
-  Crown,
+  Sparkles,
 } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { useNotifications } from '../../hooks/useNotifications';
@@ -63,7 +63,7 @@ export default function Navbar({
       labelKey: 'navbar.notifications',
       badge: notificationsBadge,
     },
-    { to: '/shop', icon: <Crown size={22} />, labelKey: 'navbar.premium', premium: true },
+    { to: '/shop', icon: <Sparkles size={22} />, labelKey: 'navbar.shop', premium: true },
     { to: '/profile', icon: <User size={22} />, labelKey: 'navbar.profile' },
     { to: '/settings', icon: <Settings size={22} />, labelKey: 'navbar.settings' },
   ];

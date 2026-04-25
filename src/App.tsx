@@ -17,7 +17,6 @@ const Terms = lazy(() => import('./pages/Terms'));
 const Privacy = lazy(() => import('./pages/Privacy'));
 const CommunityGuidelines = lazy(() => import('./pages/CommunityGuidelines'));
 const Shop = lazy(() => import('./pages/Shop'));
-const Premium = lazy(() => import('./pages/Premium'));
 const Waitlist = lazy(() => import('./pages/Waitlist'));
 const Released = lazy(() => import('./pages/Released'));
 
@@ -78,7 +77,6 @@ function App() {
           <Route path="/settings" element={<Settings />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route path="/shop" element={<Shop />} />
-          <Route path="/premium" element={<Premium />} />
           <Route path="/waitlist" element={<Waitlist />} />
           <Route path="/released" element={<Released />} />
         </Route>

@@ -31,7 +31,7 @@ const ru: Translations = {
     notifications: 'Уведомления',
     profile: 'Профиль',
     settings: 'Настройки',
-    premium: 'Премиум',
+    shop: 'Магазин',
     unreadSuffix: 'непрочитанных',
   },
 
@@ -371,9 +371,10 @@ const ru: Translations = {
       privacyPolicy: 'Политика конфиденциальности',
       termsOfService: 'Условия использования',
     },
-    premiumBanner: {
-      title: 'Lumina Premium',
-      subtitle: 'Безлимитные лайки, сообщения и многое другое',
+    starsBanner: {
+      title: 'Мои звёзды',
+      balance: '⭐ {count} доступно',
+      topUp: 'Пополнить',
     },
     toast: {
       dataExported: 'Данные экспортированы',

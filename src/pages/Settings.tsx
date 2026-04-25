@@ -10,7 +10,7 @@ import {
   ChevronDown,
   Download,
   Trash2,
-  Crown,
+  Sparkles,
   LogOut,
   Palette,
   Sun,
@@ -28,6 +28,7 @@ import { Button } from '../components/ui/Button';
 import { storage } from '../utils/helpers';
 import { useLanguage } from '../i18n';
 import type { Lang } from '../i18n';
+import { useStars } from '../hooks/useStars';
 import s from './Settings.module.css';
 
 /* ── Анимация появления ── */
@@ -128,6 +129,7 @@ export default function Settings() {
   const navigate = useNavigate();
   const { t, lang, setLang } = useLanguage();
   const { theme, setTheme } = useTheme();
+  const { balance: starsBalance } = useStars();
 
   const [settings, setSettings] = useState<Settings>(DEFAULT_SETTINGS);
   const [loaded, setLoaded] = useState(false);
@@ -273,20 +275,24 @@ export default function Settings() {
           {t('settings.pageTitle')}
         </motion.h1>
 
-        {/* ════════ Premium-баннер ════════ */}
+        {/* ════════ Мои звёзды ════════ */}
         <motion.div
           initial="hidden"
           animate="visible"
           custom={0.5}
           variants={fadeUp}
         >
-          <Link to="/premium" className={s.premiumBanner}>
-            <Crown size={20} />
-            <div className={s.premiumBannerText}>
-              <span className={s.premiumBannerTitle}>{t('settings.premiumBanner.title')}</span>
-              <span className={s.premiumBannerSub}>{t('settings.premiumBanner.subtitle')}</span>
+          <Link to="/shop" className={s.starsBanner}>
+            <div className={s.starsBannerIcon} aria-hidden="true">
+              <Sparkles size={20} />
             </div>
-            <ChevronDown size={16} className={s.premiumBannerArrow} />
+            <div className={s.starsBannerText}>
+              <span className={s.starsBannerTitle}>{t('settings.starsBanner.title')}</span>
+              <span className={s.starsBannerSub}>
+                {t('settings.starsBanner.balance', { count: String(starsBalance.toLocaleString()) })}
+              </span>
+            </div>
+            <span className={s.starsBannerCta}>{t('settings.starsBanner.topUp')}</span>
           </Link>
         </motion.div>
 

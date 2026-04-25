@@ -753,11 +753,13 @@ export default function Chat() {
               )}
 
               <AnimatePresence initial={false}>
-                {messages.map((msg, i) => {
+                {messages
+                  .filter((msg) => !/^\[GIFT:[^\]]+\]$/.test(msg.content?.trim() ?? ''))
+                  .map((msg, i, arr) => {
                   return (
                   <div key={msg.id}>
                     {/* Date separator */}
-                    {shouldShowDateSep(msg, messages[i - 1] ?? null) && (
+                    {shouldShowDateSep(msg, arr[i - 1] ?? null) && (
                       <div className={s.dateSeparator}>
                         <span className={s.dateLabel}>{formatDateLabel(msg.timestamp)}</span>
                       </div>

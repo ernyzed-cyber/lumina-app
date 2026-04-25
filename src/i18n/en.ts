@@ -29,7 +29,7 @@ const en = {
     notifications: 'Notifications',
     profile: 'Profile',
     settings: 'Settings',
-    premium: 'Premium',
+    shop: 'Shop',
     unreadSuffix: 'unread',
   },
 
@@ -369,9 +369,10 @@ const en = {
       privacyPolicy: 'Privacy Policy',
       termsOfService: 'Terms of Service',
     },
-    premiumBanner: {
-      title: 'Lumina Premium',
-      subtitle: 'Unlock unlimited likes, messages & more',
+    starsBanner: {
+      title: 'My Stars',
+      balance: '⭐ {count} available',
+      topUp: 'Top up',
     },
     toast: {
       dataExported: 'Data exported',
