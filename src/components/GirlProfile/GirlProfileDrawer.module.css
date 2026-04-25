@@ -516,3 +516,60 @@
     max-height: 80vh;
   }
 }
+
+/* === Gifts received from current user === */
+.giftsGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 4px;
+}
+
+.giftChip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px 8px 10px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.14), rgba(139, 92, 246, 0.10));
+  border: 1px solid rgba(245, 158, 11, 0.30);
+  font-size: var(--text-sm);
+  color: var(--text-primary);
+  font-weight: 600;
+  transition: transform 0.18s ease, border-color 0.18s ease;
+}
+
+.giftChip:hover {
+  transform: translateY(-1px);
+  border-color: rgba(245, 158, 11, 0.55);
+}
+
+.giftEmoji {
+  font-size: 20px;
+  line-height: 1;
+  filter: drop-shadow(0 0 4px rgba(245, 158, 11, 0.45));
+}
+
+.giftCount {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 7px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #fbbf24, #d97706);
+  color: #1a1208;
+  font-size: 11px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.giftsEmpty {
+  font-size: var(--text-sm);
+  color: var(--text-muted);
+  font-style: italic;
+  margin: 4px 0 0;
+}
+

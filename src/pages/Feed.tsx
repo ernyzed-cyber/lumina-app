@@ -530,6 +530,7 @@ export default function Feed() {
     bodyAverage: t('filters.bodyAverage'),
     bodyCurvy: t('filters.bodyCurvy'),
     bodyPlus: t('filters.bodyPlus'),
+    giftsTitle: t('profile.gifts.sectionTitle'),
   }), [t]);
 
   /* ── Loading state ── */

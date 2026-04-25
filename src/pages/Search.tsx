@@ -260,6 +260,7 @@ export default function Search() {
     bodyAverage: t('filters.bodyAverage'),
     bodyCurvy: t('filters.bodyCurvy'),
     bodyPlus: t('filters.bodyPlus'),
+    giftsTitle: t('profile.gifts.sectionTitle'),
   }), [t]);
 
   if (authLoading || !user || takenLoading) return null;

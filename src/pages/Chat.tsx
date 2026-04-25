@@ -159,6 +159,7 @@ export default function Chat() {
     bodyAverage: t('filters.bodyAverage'),
     bodyCurvy: t('filters.bodyCurvy'),
     bodyPlus: t('filters.bodyPlus'),
+    giftsTitle: t('profile.gifts.sectionTitle'),
   }), [t]);
 
   /* ── Translated constants (depend on current language) ── */

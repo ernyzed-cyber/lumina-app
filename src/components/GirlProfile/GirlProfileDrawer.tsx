@@ -8,6 +8,7 @@
 import { useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import type { Girl } from '../../data/girls';
+import { useGirlGifts } from '../../hooks/useGirlGifts';
 import styles from './GirlProfileDrawer.module.css';
 
 /* ── Localised labels passed from parent ── */
@@ -76,6 +77,8 @@ export interface GirlProfileLabels {
   bodyAverage: string;
   bodyCurvy: string;
   bodyPlus: string;
+  /* Gifts */
+  giftsTitle: string;
 }
 
 interface Props {
@@ -217,6 +220,7 @@ const modalVariants = {
 
 export default function GirlProfileDrawer({ open, girl, onClose, t, onChat, onLike, onSuperLike, hideActionBar }: Props) {
   const navigate = useNavigate();
+  const { gifts: receivedGifts } = useGirlGifts(girl?.id ?? null);
 
   if (!girl) return null;
 
@@ -410,6 +414,22 @@ export default function GirlProfileDrawer({ open, girl, onClose, t, onChat, onLi
                   <div className={styles.interestTags}>
                     {girl.interests.map((interest, i) => (
                       <span key={i} className={styles.interestTag}>{interest}</span>
+                    ))}
+                  </div>
+                </section>
+              )}
+
+              {/* ── Gifts you sent her ── */}
+              {receivedGifts.length > 0 && (
+                <section className={styles.infoBlock}>
+                  <span className={styles.infoLabel}>{t.giftsTitle}</span>
+                  <div className={styles.giftsGrid}>
+                    {receivedGifts.map((g) => (
+                      <div key={g.giftId} className={styles.giftChip} title={g.name}>
+                        <span className={styles.giftEmoji} aria-hidden="true">{g.emoji}</span>
+                        <span>{g.name}</span>
+                        {g.count > 1 && <span className={styles.giftCount}>×{g.count}</span>}
+                      </div>
                     ))}
                   </div>
                 </section>
