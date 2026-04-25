@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase';
 import { tg } from '../lib/telegram';
 
 export type PackId = 'stars_100' | 'stars_550' | 'stars_2400' | 'stars_13000';
+export type PaymentProvider = 'cryptocloud' | 'telegram';
 
 export function useStars() {
   const [balance, setBalance] = useState<number>(0);
@@ -44,26 +45,47 @@ export function useStars() {
   }, [fetchBalance]);
 
   /**
-   * Open CryptoCloud checkout for the given pack.
-   * 1. Call billing-create-invoice edge function → get pay_url
-   * 2. Open pay_url in a new tab
-   * 3. Stars will be credited asynchronously via webhook
-   * 4. Balance re-fetches when the user returns to this tab
+   * Open checkout for the given pack via the chosen payment provider.
+   *
+   *   cryptocloud → calls billing-create-invoice → opens CryptoCloud pay_url
+   *   telegram    → calls billing-create-invoice-tg → opens t.me/<bot> deep link
+   *
+   * In both cases stars are credited asynchronously by a webhook
+   * (billing-webhook for CryptoCloud, tg-bot-webhook for Telegram).
+   * The balance re-fetches automatically when the user returns to this tab.
    */
-  const buyPack = useCallback(async (packId: PackId) => {
+  const buyPack = useCallback(async (
+    packId: PackId,
+    provider: PaymentProvider = 'cryptocloud',
+  ) => {
     setLoading(true);
     setError(null);
     try {
+      const fnName = provider === 'telegram'
+        ? 'billing-create-invoice-tg'
+        : 'billing-create-invoice';
+
       const { data, error: fnError } = await supabase.functions.invoke(
-        'billing-create-invoice',
+        fnName,
         { body: { pack_id: packId } },
       );
-      if (fnError || !data?.pay_url) {
+
+      if (fnError) {
         tg.haptic('error');
-        throw fnError ?? new Error('no pay_url');
+        throw fnError;
       }
+
+      const url = provider === 'telegram'
+        ? (data as { deep_link?: string } | null)?.deep_link
+        : (data as { pay_url?: string } | null)?.pay_url;
+
+      if (!url) {
+        tg.haptic('error');
+        throw new Error(provider === 'telegram' ? 'no deep_link' : 'no pay_url');
+      }
+
       tg.haptic('success');
-      window.open(data.pay_url as string, '_blank');
+      window.open(url, '_blank');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Unknown error');
     } finally {

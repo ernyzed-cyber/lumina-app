@@ -779,9 +779,15 @@ const en = {
     balance: 'Your balance',
     buy: 'Buy',
     bonus: 'bonus',
-    footnote: 'Payment via CryptoCloud. Prices in USD.',
+    footnote: 'Pay via CryptoCloud or Telegram Stars.',
     processing: 'Opening payment page...',
     error: 'Something went wrong. Try again.',
+    choosePaymentMethod: 'Choose payment method',
+    payCrypto: 'Cryptocurrency',
+    payCryptoDesc: 'USDT, BTC, ETH and more via CryptoCloud',
+    payTelegram: 'Telegram Stars',
+    payTelegramDesc: 'Pay with ⭐ inside Telegram',
+    paidToast: 'Payment received! ⭐ will appear shortly.',
   },
 
   /* ── Gifts ── */

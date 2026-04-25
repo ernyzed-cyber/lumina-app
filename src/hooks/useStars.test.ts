@@ -129,6 +129,52 @@ describe('useStars – buyPack', () => {
   });
 });
 
+describe('useStars – buyPack (telegram provider)', () => {
+  it('calls billing-create-invoice-tg and opens deep_link when provider=telegram', async () => {
+    const openSpy = vi.spyOn(window, 'open').mockReturnValue(null);
+    mockInvoke.mockResolvedValue({
+      data: { deep_link: 'https://t.me/LuminaPayBot?start=inv_abc' },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useStars());
+    await act(async () => { await result.current.buyPack('stars_100', 'telegram'); });
+
+    expect(mockInvoke).toHaveBeenCalledWith('billing-create-invoice-tg', {
+      body: { pack_id: 'stars_100' },
+    });
+    expect(openSpy).toHaveBeenCalledWith('https://t.me/LuminaPayBot?start=inv_abc', '_blank');
+    expect(result.current.error).toBeNull();
+    expect(result.current.loading).toBe(false);
+
+    openSpy.mockRestore();
+  });
+
+  it('sets error when telegram response is missing deep_link', async () => {
+    mockInvoke.mockResolvedValue({ data: {}, error: null });
+
+    const { result } = renderHook(() => useStars());
+    await act(async () => { await result.current.buyPack('stars_550', 'telegram'); });
+
+    expect(result.current.error).toBe('no deep_link');
+  });
+
+  it('defaults to cryptocloud when provider is omitted', async () => {
+    vi.spyOn(window, 'open').mockReturnValue(null);
+    mockInvoke.mockResolvedValue({
+      data: { pay_url: 'https://pay.cryptocloud.plus/x' },
+      error: null,
+    });
+
+    const { result } = renderHook(() => useStars());
+    await act(async () => { await result.current.buyPack('stars_100'); });
+
+    expect(mockInvoke).toHaveBeenCalledWith('billing-create-invoice', {
+      body: { pack_id: 'stars_100' },
+    });
+  });
+});
+
 describe('useStars – buyMessagesPack', () => {
   it('calls messages-buy-pack and refreshes balance on success', async () => {
     mockInvoke.mockResolvedValue({ data: { ok: true, messages_bought: 100 }, error: null });

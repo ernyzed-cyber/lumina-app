@@ -781,9 +781,15 @@ const ru: Translations = {
     balance: 'Ваш баланс',
     buy: 'Купить',
     bonus: 'бонус',
-    footnote: 'Оплата через CryptoCloud. Цены в USD.',
+    footnote: 'Оплата через CryptoCloud или Telegram Stars.',
     processing: 'Открываем страницу оплаты...',
     error: 'Что-то пошло не так. Попробуйте ещё раз.',
+    choosePaymentMethod: 'Выберите способ оплаты',
+    payCrypto: 'Криптовалютой',
+    payCryptoDesc: 'USDT, BTC, ETH и др. через CryptoCloud',
+    payTelegram: 'Telegram Stars',
+    payTelegramDesc: 'Оплата ⭐ внутри Telegram',
+    paidToast: 'Оплата принята! ⭐ скоро появятся на балансе.',
   },
 
   /* ── Подарки ── */
