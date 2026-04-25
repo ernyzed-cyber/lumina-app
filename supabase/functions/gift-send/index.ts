@@ -9,6 +9,7 @@ const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, x-supabase-api-version, content-type',
+  'Access-Control-Max-Age': '0',
   'Content-Type': 'application/json',
 };
 
