@@ -22,7 +22,7 @@ const mockGetUser = supabase.auth.getUser as ReturnType<typeof vi.fn>;
 const mockFrom = supabase.from as ReturnType<typeof vi.fn>;
 const mockInvoke = supabase.functions.invoke as ReturnType<typeof vi.fn>;
 
-function makeFromChain(rows: { amount: number }[]) {
+function makeFromChain(rows: { delta: number }[]) {
   const eq = vi.fn().mockResolvedValue({ data: rows, error: null });
   const select = vi.fn().mockReturnValue({ eq });
   mockFrom.mockReturnValue({ select });
@@ -32,7 +32,7 @@ function makeFromChain(rows: { amount: number }[]) {
 beforeEach(() => {
   vi.clearAllMocks();
   mockGetUser.mockResolvedValue({ data: { user: { id: 'user-1' } } });
-  makeFromChain([{ amount: 100 }, { amount: 50 }]);
+  makeFromChain([{ delta: 100 }, { delta: 50 }]);
 });
 
 describe('useStars – balance', () => {
@@ -139,7 +139,7 @@ describe('useStars – buyMessagesPack', () => {
     // Reset call count; simulate balance after spending 100⭐
     mockInvoke.mockClear();
     mockFrom.mockClear();
-    makeFromChain([{ amount: 50 }]);
+    makeFromChain([{ delta: 50 }]);
 
     await act(async () => { await result.current.buyMessagesPack(); });
 
@@ -164,7 +164,7 @@ describe('useStars – buyMessagesPack', () => {
     await waitFor(() => expect(result.current.balance).toBe(150));
 
     mockFrom.mockClear();
-    makeFromChain([{ amount: 200 }]);
+    makeFromChain([{ delta: 200 }]);
 
     await act(async () => { await result.current.refetch(); });
 

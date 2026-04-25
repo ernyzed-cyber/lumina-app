@@ -10,7 +10,7 @@ const CC_SHOP_ID = Deno.env.get('CRYPTOCLOUD_SHOP_ID')!;
 const CORS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'authorization, content-type',
+  'Access-Control-Allow-Headers': 'authorization, apikey, x-client-info, x-supabase-api-version, content-type',
   'Content-Type': 'application/json',
 };
 

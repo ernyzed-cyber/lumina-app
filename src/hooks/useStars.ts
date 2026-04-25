@@ -17,11 +17,11 @@ export function useStars() {
 
     const { data } = await supabase
       .from('stars_ledger')
-      .select('amount')
+      .select('delta')
       .eq('user_id', user.id);
 
     const total = (data ?? []).reduce(
-      (sum: number, row: { amount: number }) => sum + row.amount,
+      (sum: number, row: { delta: number }) => sum + row.delta,
       0,
     );
     setBalance(total);
