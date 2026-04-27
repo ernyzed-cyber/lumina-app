@@ -43,6 +43,12 @@ const MAX_CHARS = 500;
 const WARN_CHARS = 400;
 const DAILY_MESSAGE_LIMIT = 100;
 const MSG_LIMIT_KEY = 'dailyMsgLimits';
+// Hard timeout for the edge fetch — Supabase free edge can cold-start slowly.
+// Без этого fetch может висеть бесконечно и блокировать inflightRef навсегда.
+const EDGE_FETCH_TIMEOUT_MS = 45_000;
+// Watchdog: верхняя граница длительности одного AI-цикла (fetch + schedule + сегменты).
+// schedule может быть до ~210s в work-mode, плюс пара сегментов — даём 5 минут.
+const MAX_TURN_MS = 5 * 60_000;
 
 
 /* ── Emoji data (emojis themselves are not translatable) ── */
@@ -203,6 +209,9 @@ export default function Chat() {
   const inflightRef = useRef(false);
   const queuedRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
+  // Watchdog: если runAiTurn застрял (cold start edge, network freeze) — насильно
+  // освобождаем мьютекс через MAX_TURN_MS, чтобы юзер не оказался "заперт".
+  const inflightStartRef = useRef<number>(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [giftPickerOpen, setGiftPickerOpen] = useState(false);
@@ -439,6 +448,9 @@ export default function Chat() {
      быстрых user-сообщений сольётся в ОДИН ответ. */
   const runAiTurn = useCallback(async () => {
     if (!currentGirl) return;
+    // Abort the edge fetch if it hangs longer than EDGE_FETCH_TIMEOUT_MS.
+    const abortCtrl = new AbortController();
+    const abortTimer = setTimeout(() => abortCtrl.abort(), EDGE_FETCH_TIMEOUT_MS);
     try {
       const recent = messagesRef.current.slice(-8).map((m) => ({
         role: m.role,
@@ -456,7 +468,9 @@ export default function Chat() {
           girlId: currentGirl.id,
           userId: user?.id,
         }),
+        signal: abortCtrl.signal,
       });
+      clearTimeout(abortTimer);
 
       if (res.status === 429) {
         const body = await res.json().catch(() => ({}));
@@ -553,6 +567,7 @@ export default function Chat() {
       saveMessage('assistant', fallback);
       setTimeout(() => setLiveOnline(false), 30_000);
     } finally {
+      clearTimeout(abortTimer);
       setTimeout(() => setIsTyping(false), 400);
     }
   }, [currentGirl, session, user, t, tr, saveMessage]);
@@ -595,8 +610,18 @@ export default function Chat() {
       // НЕ стартуем параллельный fetch. Просто помечаем очередь:
       // по завершении текущего цикла runAiTurn выполнится ещё раз с обновлённым контекстом.
       if (inflightRef.current) {
-        queuedRef.current = true;
-        return;
+        // Watchdog: если предыдущий цикл «висит» дольше MAX_TURN_MS — насильно
+        // освобождаем мьютекс. Это страховка от ситуаций, когда fetch/await завис
+        // и не дошёл до finally (cold start edge, network freeze, browser throttling).
+        const stuckMs = Date.now() - inflightStartRef.current;
+        if (stuckMs > MAX_TURN_MS) {
+          console.warn('[Chat] inflight watchdog: previous turn stuck for', stuckMs, 'ms — releasing mutex');
+          inflightRef.current = false;
+          queuedRef.current = false;
+        } else {
+          queuedRef.current = true;
+          return;
+        }
       }
 
       // Статус будет управляться расписанием с сервера:
@@ -605,6 +630,7 @@ export default function Chat() {
       setLiveOnline(false);
 
       inflightRef.current = true;
+      inflightStartRef.current = Date.now();
       try {
         do {
           // Debounce: ждём 400мс, собирая все быстрые сообщения (подарки, эмодзи и т.п.)
@@ -612,10 +638,12 @@ export default function Chat() {
           // сообщениями за эти 400мс, не вызвал лишний второй цикл.
           await new Promise((r) => setTimeout(r, 400));
           queuedRef.current = false;
+          inflightStartRef.current = Date.now();
           await runAiTurn();
         } while (queuedRef.current);
       } finally {
         inflightRef.current = false;
+        inflightStartRef.current = 0;
       }
     },
     [input, currentGirl, saveMessage, messagesLeft, runAiTurn],
