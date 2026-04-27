@@ -651,9 +651,11 @@ export default function Chat() {
       messagesRef.current = [...messagesRef.current, userMsg];
 
       // Статус будет управляться расписанием с сервера:
-      // фаза "игнор" (offline) → "в сети" (online) → "печатает" (typing) → ответ.
-      setIsTyping(false);
-      setLiveOnline(false);
+      // фаза "игнор" → "в сети" → "печатает" → ответ.
+      // НЕ сбрасываем liveOnline здесь: если она уже была online после прошлого
+      // ответа (5-минутное окно), пусть остаётся online — иначе пользователь
+      // видит «офлайн-вспышку» сразу после отправки своего сообщения.
+      // isTyping тоже не трогаем: runAiTurn включит его в нужной фазе.
 
       // Лочим инпут до прихода ответа. Watchdog снимет лок если runAiTurn
       // зависнет дольше REPLY_WATCHDOG_MS (cold start edge, network freeze).
