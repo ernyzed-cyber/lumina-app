@@ -212,6 +212,10 @@ export default function Chat() {
   // зависшие fetch'и) и одновременно учит юзера выражать мысль одним
   // сообщением, а не спамить. Watchdog снимает блок если AI завис.
   const [awaitingReply, setAwaitingReply] = useState(false);
+  // Зеркало awaitingReply для чтения внутри sendMessage без попадания
+  // в его deps — иначе useCallback пересоздавался бы при каждом setAwaitingReply,
+  // что вызывает каскад ре-рендеров и в худшем случае перемонтирование Chat.
+  const awaitingReplyRef = useRef(false);
   // Индекс ротирующейся подсказки в waitingForReplyHints.
   const hintIndexRef = useRef(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
@@ -275,6 +279,7 @@ export default function Chat() {
   const userId = user?.id;
   const girlId = currentGirl?.id;
   useEffect(() => {
+    console.log('[Chat] loadMessages effect triggered', { userId, girlId });
     if (!userId || !girlId) return;
 
     let cancelled = false;
@@ -469,7 +474,11 @@ export default function Chat() {
      Читает актуальный контекст из messagesRef, поэтому очередь из нескольких
      быстрых user-сообщений сольётся в ОДИН ответ. */
   const runAiTurn = useCallback(async () => {
-    if (!currentGirl) return;
+    if (!currentGirl) {
+      console.warn('[runAiTurn] no currentGirl — bail');
+      return;
+    }
+    console.log('[runAiTurn] START', { girlId: currentGirl.id, hasSession: !!session });
     // Abort the edge fetch if it hangs longer than EDGE_FETCH_TIMEOUT_MS.
     const abortCtrl = new AbortController();
     const abortTimer = setTimeout(() => abortCtrl.abort(), EDGE_FETCH_TIMEOUT_MS);
@@ -479,6 +488,7 @@ export default function Chat() {
         content: m.content,
       }));
 
+      console.log('[runAiTurn] fetching edge', { url: import.meta.env.VITE_EDGE_FUNCTION_URL });
       const res = await fetch(import.meta.env.VITE_EDGE_FUNCTION_URL, {
         method: 'POST',
         headers: {
@@ -493,6 +503,7 @@ export default function Chat() {
         signal: abortCtrl.signal,
       });
       clearTimeout(abortTimer);
+      console.log('[runAiTurn] edge responded', { status: res.status, ok: res.ok });
 
       if (res.status === 429) {
         const body = await res.json().catch(() => ({}));
@@ -533,6 +544,7 @@ export default function Chat() {
         onlineMs: 4000,
         typingMs: 3000,
       };
+      console.log('[runAiTurn] schedule', schedule, 'replyLen:', replyFull.length);
 
       await new Promise((r) => setTimeout(r, schedule.ignoreMs));
       setLiveOnline(true);
@@ -601,10 +613,9 @@ export default function Chat() {
       if (!content || !currentGirl) return;
 
       // Если AI ещё печатает / в процессе ответа — НЕ принимаем второе сообщение.
-      // Вместо этого мягко учим юзера не спамить: показываем ротирующуюся подсказку
-      // про "учись слушать". Send-кнопка disabled, но Enter мог сработать —
-      // плюс юзер мог жать кнопку (defensive check тут).
-      if (awaitingReply) {
+      // Читаем актуальное значение из ref'а: state-версия awaitingReply в deps
+      // привела бы к пересозданию useCallback и каскаду ре-рендеров.
+      if (awaitingReplyRef.current) {
         const hints: string[] = tr.chat.waitingForReplyHints;
         const hint = hints[hintIndexRef.current % hints.length];
         hintIndexRef.current += 1;
@@ -646,21 +657,28 @@ export default function Chat() {
 
       // Лочим инпут до прихода ответа. Watchdog снимет лок если runAiTurn
       // зависнет дольше REPLY_WATCHDOG_MS (cold start edge, network freeze).
+      awaitingReplyRef.current = true;
       setAwaitingReply(true);
       const watchdog = setTimeout(() => {
         console.warn('[Chat] reply watchdog fired — releasing input lock');
+        awaitingReplyRef.current = false;
         setAwaitingReply(false);
         showToast(t('chat.waitingForReplyStuck'), 'warning');
       }, REPLY_WATCHDOG_MS);
 
+      console.log('[Chat] sendMessage → runAiTurn START');
       try {
         await runAiTurn();
+        console.log('[Chat] runAiTurn DONE');
+      } catch (e) {
+        console.error('[Chat] runAiTurn threw:', e);
       } finally {
         clearTimeout(watchdog);
+        awaitingReplyRef.current = false;
         setAwaitingReply(false);
       }
     },
-    [input, currentGirl, awaitingReply, tr, t, showToast, saveMessage, messagesLeft, runAiTurn],
+    [input, currentGirl, tr, t, showToast, saveMessage, messagesLeft, runAiTurn],
   );
 
   /* ── Enter to send ── */
