@@ -106,10 +106,27 @@ export default function Auth() {
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [direction, setDirection] = useState(0);
 
-  /* ── Redirect to feed once user is confirmed by context ── */
+  /* ── Redirect once user is confirmed by context ──
+     Если у юзера уже есть активный assignment (released_at IS NULL) — сразу в /chat,
+     иначе — в /feed подбирать девушку. */
   useEffect(() => {
     if (!loading && user && mode === 'login') {
-      navigate('/feed', { replace: true });
+      let cancelled = false;
+      (async () => {
+        try {
+          const { data: asgn } = await supabase
+            .from('assignments')
+            .select('id')
+            .eq('user_id', user.id)
+            .is('released_at', null)
+            .maybeSingle();
+          if (cancelled) return;
+          navigate(asgn ? '/chat' : '/feed', { replace: true });
+        } catch {
+          if (!cancelled) navigate('/feed', { replace: true });
+        }
+      })();
+      return () => { cancelled = true; };
     }
   }, [user, loading, mode, navigate]);
 
@@ -335,14 +352,34 @@ export default function Auth() {
     }
   }
 
+  /* ── Pick destination after auth based on existing assignment ── */
+  const navigateAfterAuth = useCallback(async () => {
+    try {
+      const { data: { user: u } } = await supabase.auth.getUser();
+      if (!u) {
+        navigate('/feed');
+        return;
+      }
+      const { data: asgn } = await supabase
+        .from('assignments')
+        .select('id')
+        .eq('user_id', u.id)
+        .is('released_at', null)
+        .maybeSingle();
+      navigate(asgn ? '/chat' : '/feed');
+    } catch {
+      navigate('/feed');
+    }
+  }, [navigate]);
+
   /* ── Telegram verification: watch for real-time updates ── */
   useEffect(() => {
     if (telegramVerified && onboardingStep === 6) {
       setVerificationStatus('verified');
       showToast(t('auth.telegramVerify.verified'), 'success');
-      setTimeout(() => navigate('/feed'), 1500);
+      setTimeout(() => { navigateAfterAuth(); }, 1500);
     }
-  }, [telegramVerified, onboardingStep, navigate, showToast, t]);
+  }, [telegramVerified, onboardingStep, navigateAfterAuth, showToast, t]);
 
   /* ── Refresh verification code ── */
   const handleRefreshCode = useCallback(async () => {
@@ -355,7 +392,7 @@ export default function Auth() {
 
   /* ── Skip telegram verification ── */
   function handleSkipVerification() {
-    navigate('/feed');
+    navigateAfterAuth();
   }
 
   /* ── Password strength ── */

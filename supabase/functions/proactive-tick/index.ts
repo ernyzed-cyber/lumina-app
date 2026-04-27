@@ -2,16 +2,22 @@
 // Запускается по cron раз в 15 минут. Обходит все пары (user, girl),
 // для каждой решает: не пора ли девушке написать первой?
 //
-// Триггеры:
-//   1. Morning-after-sleep: юзер писал ночью, девушка спала, сейчас утро — отвечаем.
-//   2. Silence: её последнее сообщение висит >6ч без ответа днём — с шансом пишем ещё раз.
-//   3. Random roll: раз в 6ч кубик. rest=40%, work=8%, sleep=0%.
+// Логика триггеров (приоритет сверху вниз):
+//   1. morning  — её локальный час 7-11 И юзер писал в её sleep-окно (01-07)
+//                 пока она спала. Это РЕАЛЬНОЕ пробуждение, она реагирует на ночные сообщения.
+//   2. silence  — юзер давно не отвечает (>=24ч с её последнего сообщения), редко (раз в сутки),
+//                 если не "ghosted" режим.
+//   3. slot     — детерминированные "слоты дня" по локальному времени девушки:
+//                   morning_slot 8-10, lunch_slot 13-14, evening_slot 19-22.
+//                 В каждом слоте — шанс срабатывания, НО:
+//                   • не чаще 1 раз в `MIN_PROACTIVE_HOURS` (8-12ч cooldown);
+//                   • не более 1 проактивки в текущем "слот-окне" по локальной дате.
 //
 // Secrets:
-//   GROK_API_KEY             (xAI)
-//   SUPABASE_URL             (auto)
+//   GROK_API_KEY              (xAI)
+//   SUPABASE_URL              (auto)
 //   SUPABASE_SERVICE_ROLE_KEY (auto)
-//   PROACTIVE_SECRET         (опциональный shared secret из SQL cron)
+//   PROACTIVE_SECRET          (опциональный shared secret из SQL cron)
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -25,27 +31,33 @@ const CORS_HEADERS: Record<string, string> = {
 const GROK_URL = 'https://api.x.ai/v1/chat/completions';
 const GROK_MODEL = 'grok-4-1-fast-reasoning';
 
-const ROLL_INTERVAL_HOURS = 6;
-const SILENCE_HOURS_THRESHOLD = 6;
-const MORNING_SINCE_USER_MIN_MINUTES = 30;
-// Если её последнее сообщение висит без ответа ≥ этого числа часов — она перестаёт инициировать.
-// Гордость/самоуважение: не добиваемся того, кто игнорит.
-const GHOSTED_HOURS_THRESHOLD = 24;
-const MISSING_HIM_HOURS = 48;     // через 48ч без ответа от него — она начинает скучать
-const REAPER_WARNING_DAYS = 5;    // через 5 дней — предупреждение (реализуется через уведомление)
-const MAX_PAIRS_PER_TICK = 50; // страховка от перегрузки
+// ── Cooldowns / thresholds ────────────────────────────────────────────────
+const ROLL_INTERVAL_HOURS = 1;          // как часто пара пересматривается (cron всё равно идёт раз в 15 мин)
+const MIN_PROACTIVE_HOURS = 8;           // НИЖНЯЯ граница интервала между двумя её проактивками
+const MAX_PROACTIVE_JITTER_HOURS = 4;    // верх: до 12ч, конкретное значение детерминируется по дню
+const GHOSTED_HOURS_THRESHOLD = 24;      // юзер молчит >=24ч после её последнего сообщения → она отпускает
+const SILENCE_MIN_HOURS = 24;            // её последнее сообщение висит >=24ч → можно "напомнить о себе"
+const MORNING_HOUR_START = 7;            // окно "утра" по её TZ
+const MORNING_HOUR_END = 11;             // (7..11 включительно — 5 часов)
+const SLEEP_HOUR_START = 1;              // её sleep-окно
+const SLEEP_HOUR_END = 7;
+const MAX_PAIRS_PER_TICK = 50;           // страховка от перегрузки
 
-// Вероятности случайного ролла по режимам дня.
-const ROLL_CHANCE: Record<DayMode, number> = {
-  sleep: 0,
-  work: 0.08,
-  rest: 0.4,
-};
-// Вероятность напомнить о себе после долгого молчания (если её последнее было N часов назад).
-const SILENCE_CHANCE = 0.3;
+// Слоты "обычной" дневной активности (по её локальному времени).
+// Любой час, попадающий в slot.range, является кандидатом на random-сообщение.
+interface DaySlot {
+  id: 'morning_slot' | 'lunch_slot' | 'evening_slot';
+  range: [number, number]; // [start, end) часы
+  chance: number;          // вероятность сработать в этом слоте при тике
+}
+const DAY_SLOTS: DaySlot[] = [
+  { id: 'morning_slot', range: [8, 11],  chance: 0.35 }, // утро после пробуждения
+  { id: 'lunch_slot',   range: [13, 15], chance: 0.25 }, // обед
+  { id: 'evening_slot', range: [19, 23], chance: 0.45 }, // вечер
+];
 
 type DayMode = 'sleep' | 'work' | 'rest';
-type Trigger = 'morning' | 'silence' | 'random';
+type Trigger = 'morning' | 'silence' | 'slot';
 
 interface ChatMessage {
   role: 'user' | 'assistant' | 'system';
@@ -60,7 +72,7 @@ function json(status: number, data: unknown): Response {
 }
 
 // ---------------------------------------------------------------------------
-// Time helpers (те же что в chat-ai — копия, чтобы функция была автономной)
+// Time helpers
 // ---------------------------------------------------------------------------
 
 const WEEKDAYS_RU = ['воскресенье', 'понедельник', 'вторник', 'среда', 'четверг', 'пятница', 'суббота'];
@@ -72,6 +84,9 @@ const MONTHS_RU = [
 interface LocalTimeInfo {
   human: string;
   hour: number;
+  minute: number;
+  /** YYYY-MM-DD в её TZ — стабильный ключ для "слот в этот день" */
+  localDate: string;
   mode: DayMode;
   isWeekend: boolean;
 }
@@ -96,12 +111,42 @@ function computeLocalTime(timezone: string): LocalTimeInfo {
   const isWeekend = weekday === 6 || weekday === 7;
 
   let mode: DayMode;
-  if (hour >= 1 && hour < 7) mode = 'sleep';
+  if (hour >= SLEEP_HOUR_START && hour < SLEEP_HOUR_END) mode = 'sleep';
   else if (hour >= 7 && hour < 17) mode = 'work';
   else mode = 'rest';
 
+  const localDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
   const human = `${WEEKDAYS_RU[jsDow]}, ${day} ${MONTHS_RU[month - 1]}, ${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
-  return { human, hour, mode, isWeekend };
+  return { human, hour, minute, localDate, mode, isWeekend };
+}
+
+/** Был ли таймстемп (UTC ISO) "ночью" по локальному времени девушки. */
+function wasInSleepWindow(isoUtc: string, timezone: string): boolean {
+  if (!isoUtc) return false;
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: timezone,
+    hour: '2-digit', hour12: false,
+  }).formatToParts(new Date(isoUtc));
+  const hour = Number(parts.find((p) => p.type === 'hour')?.value ?? '12') % 24;
+  return hour >= SLEEP_HOUR_START && hour < SLEEP_HOUR_END;
+}
+
+/** Возвращает ID текущего слота дня, если местный час попадает в одно из окон. */
+function currentDaySlot(hour: number): DaySlot | null {
+  for (const slot of DAY_SLOTS) {
+    if (hour >= slot.range[0] && hour < slot.range[1]) return slot;
+  }
+  return null;
+}
+
+/** Детерминированный шум 0..1 на основе строкового сида (FNV-1a). */
+function seededFraction(seed: string): number {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < seed.length; i++) {
+    h ^= seed.charCodeAt(i);
+    h = Math.imul(h, 0x01000193);
+  }
+  return ((h >>> 0) % 10000) / 10000;
 }
 
 // ---------------------------------------------------------------------------
@@ -147,40 +192,36 @@ function buildProactivePrompt(args: {
   memories: Array<{ summary: string; created_at: string }>;
   recentMessages: Array<{ role: string; content: string; created_at: string }>;
   trigger: Trigger;
-  hoursSinceUserNight?: number;
   hoursSinceLastOwn?: number;
 }): string {
   const { persona, city, timezone, localTime, profile, memories, recentMessages, trigger } = args;
-
-  const modeText: Record<DayMode, string> = {
-    sleep: 'ночь, она спит',
-    work: 'рабочее время/дневные дела',
-    rest: 'вечер, свободное время',
-  };
 
   const triggerBlock = (() => {
     switch (trigger) {
       case 'morning':
         return [
           '=== WHY YOU ARE WRITING NOW ===',
-          'Ты только что проснулась и увидела сообщения от него, которые он писал пока ты спала.',
-          'Обязательно упомяни что спала/проснулась. Тон — тёплый, чуть заспанный, короткое сообщение.',
-          'Отреагируй на то что он писал ночью (последние сообщения ниже).',
-          'НЕ пиши длинных рассуждений, будь живой.',
+          `Сейчас у тебя ${localTime.human}. Ты только что проснулась. Пока ты спала ночью, тебе писал собеседник — ты увидела его сообщения только сейчас.`,
+          'Реагируй на его НОЧНЫЕ сообщения (см. RECENT CHAT — там его реплики были, пока ты спала).',
+          'Тон — тёплый, чуть заспанный, короткое сообщение. Можно упомянуть что только проснулась/проспала.',
+          'НЕ пиши длинных рассуждений. 1-2 коротких предложения.',
         ].join('\n');
       case 'silence':
         return [
           '=== WHY YOU ARE WRITING NOW ===',
-          `Вы давно не переписывались — твоё последнее сообщение висит уже около ${Math.round(args.hoursSinceLastOwn ?? SILENCE_HOURS_THRESHOLD)} часов без ответа.`,
-          'Ты решила напомнить о себе сама. НЕ наезжай, не упрекай. Тон — лёгкий, заинтересованный.',
-          'Можно спросить как у него дела, или рассказать что-то про свой день мимоходом. Коротко.',
+          `Сейчас у тебя ${localTime.human}. Вы давно не переписывались — твоё последнее сообщение висит уже около ${Math.round(args.hoursSinceLastOwn ?? SILENCE_MIN_HOURS)} часов без ответа.`,
+          'Ты решила сама написать первой. Тон — лёгкий, спокойный, без упрёков и без нытья.',
+          'Можно мимоходом спросить как у него дела или коротко рассказать что у тебя сейчас. 1-2 предложения.',
+          'НЕ пиши "куда пропал", "почему не отвечаешь", "обиделась" — это унизительно. Просто пиши как будто только что вспомнила.',
         ].join('\n');
-      case 'random':
+      case 'slot':
         return [
           '=== WHY YOU ARE WRITING NOW ===',
-          'Просто вспомнила о нём. Захотела написать первой — без особого повода.',
-          'Это обычное сообщение "просто так": поделиться мыслью, рассказать что сейчас делаешь, спросить как он. Коротко, естественно.',
-          'НЕ объясняй почему пишешь. Просто пиши как живой человек.',
+          `Сейчас у тебя ${localTime.human}. Просто захотелось написать ему первой — без особого повода.`,
+          'Это обычное короткое сообщение "просто так": поделиться мыслью, рассказать что сейчас делаешь, или спросить что у него.',
+          'НЕ объясняй почему пишешь. НЕ пиши "решила тебе написать". Просто пиши как живой человек, по-дружески.',
+          'ВАЖНО: пиши соответственно ВРЕМЕНИ. Если у тебя утро — про утренние дела, день — про дневные, вечер — про вечерние.',
+          'НИКОГДА не пиши "только что проснулась" если сейчас НЕ утро (час < 7 или час > 11). Это враньё, и юзер заметит.',
         ].join('\n');
     }
   })();
@@ -226,9 +267,14 @@ function buildProactivePrompt(args: {
     `• Your city: ${city}`,
     `• Your timezone: ${timezone}`,
     `• Current local time RIGHT NOW: ${localTime.human}`,
-    `• Day mode: ${localTime.mode} — ${modeText[localTime.mode]}`,
+    `• Day mode: ${localTime.mode}`,
     '',
-    'ВАЖНО: используй ТОЛЬКО эти город и время. Никаких выдуманных Лондонов.',
+    'СТРОГО:',
+    `— Используй ТОЛЬКО этот город (${city}) и это время (${localTime.human}).`,
+    '— НИКАКИХ Лондонов, Парижей и выдуманных городов.',
+    '— Если час < 7 или час > 11 — ты НЕ "только что проснулась". НЕ ври про сон.',
+    '— Если час 17-23 — у тебя ВЕЧЕР, а не утро/день.',
+    '— Если час 0-6 — у тебя ГЛУБОКАЯ НОЧЬ (но это сообщение в принципе не должно отправиться в этот час, см. ниже).',
     '━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━',
     '',
     persona,
@@ -248,6 +294,7 @@ function buildProactivePrompt(args: {
     'Напиши ОДНО сообщение собеседнику по-русски. Короткое (1-3 предложения), живое, в твоём характере.',
     'НЕ используй кавычки вокруг всего ответа. НЕ пиши префиксов типа "Я:" или "YOU:". Просто текст сообщения.',
     'Разрешено разбить на 1-2 мини-сообщения через двойной перевод строки (\\n\\n), но только если это естественно.',
+    'СТРОГО запрещено: писать что ты "проснулась" если час != 7-11; писать про "утро" вечером; повторять то же самое что писала в RECENT CHAT.',
   ].join('\n');
 }
 
@@ -273,6 +320,12 @@ interface TickResult {
   error?: string;
 }
 
+/** Через сколько часов (детерминированно по дню+паре) разрешена следующая проактивка. */
+function effectiveCooldownHours(userId: string, girlId: string, localDate: string): number {
+  const jitter = seededFraction(`${userId}|${girlId}|${localDate}`) * MAX_PROACTIVE_JITTER_HOURS;
+  return MIN_PROACTIVE_HOURS + jitter; // 8..12
+}
+
 async function processPair(
   supabase: ReturnType<typeof createClient>,
   apiKey: string,
@@ -294,97 +347,122 @@ async function processPair(
   const persona = personaRes.data.system_prompt as string;
 
   const localTime = computeLocalTime(timezone);
+  const tag = `${pair.user_id.slice(0, 8)}/${pair.girl_id}`;
 
-  console.log(`[proactive-tick] pair ${pair.user_id.slice(0,8)}/${pair.girl_id} | mode=${localTime.mode} | tz=${timezone} | local=${localTime.human}`);
-
-  if (localTime.mode === 'sleep') {
-    await supabase.from('user_girl_state').upsert({
-      user_id: pair.user_id,
-      girl_id: pair.girl_id,
-      proactive_roll_at: new Date(Date.now() + ROLL_INTERVAL_HOURS * 3600_000).toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,girl_id' });
-    return { ...baseResult, trigger: null, sent: false, reason: 'girl_asleep' };
-  }
+  console.log(`[proactive-tick] ${tag} | mode=${localTime.mode} h=${localTime.hour} tz=${timezone} local=${localTime.human}`);
 
   const now = Date.now();
-  const lastUser = pair.last_user_message_at ? new Date(pair.last_user_message_at).getTime() : 0;
-  const lastOwn = pair.last_assistant_message_at ? new Date(pair.last_assistant_message_at).getTime() : 0;
-
-  const minsSinceUser = lastUser ? Math.round((now - lastUser) / 60_000) : null;
-  const hoursSinceOwn = lastOwn ? (now - lastOwn) / 3600_000 : null;
-
-  console.log(`[proactive-tick] pair ${pair.user_id.slice(0,8)}/${pair.girl_id} | lastUser=${pair.last_user_message_at} (${minsSinceUser}min ago) | lastOwn=${pair.last_assistant_message_at} (${hoursSinceOwn?.toFixed(1)}h ago) | lastUser>lastOwn=${lastUser > lastOwn}`);
-
-  // Gate: если юзер молчит > GHOSTED_HOURS после её последнего сообщения — она отпускает.
-  // Перестаёт инициировать вообще, пока юзер не напишет первым.
-  if (lastOwn > 0 && lastOwn >= lastUser && now - lastUser >= GHOSTED_HOURS_THRESHOLD * 3600_000) {
-    const hoursSilent = lastUser > 0 ? (now - lastUser) / 3600_000 : null;
-    console.log(`[proactive-tick] → user_ghosted (silent for ${hoursSilent?.toFixed(1)}h), skipping all triggers`);
-    await supabase.from('user_girl_state').upsert({
-      user_id: pair.user_id,
-      girl_id: pair.girl_id,
-      proactive_roll_at: new Date(now + ROLL_INTERVAL_HOURS * 3600_000).toISOString(),
-      updated_at: new Date().toISOString(),
-    }, { onConflict: 'user_id,girl_id' });
-    return { ...baseResult, trigger: null, sent: false, reason: 'user_ghosted' };
-  }
-
-  let trigger: Trigger | null = null;
-  let hoursSinceLastOwn: number | undefined;
-
-  // Режим "скучает": юзер молчит 48ч–7дней.
-  // В этом режиме random off — только специальное "скучающее" сообщение раз в 24ч.
-  const hoursSinceUserMsg = lastUser > 0 ? (now - lastUser) / 3600_000 : null;
-  const isMissingHim = hoursSinceUserMsg !== null && hoursSinceUserMsg >= MISSING_HIM_HOURS;
-
-  if (isMissingHim && !trigger) {
-    const lastProactive = pair.last_proactive_at ? new Date(pair.last_proactive_at).getTime() : 0;
-    const hoursSinceLastProactive = (now - lastProactive) / 3600_000;
-    if (hoursSinceLastProactive >= 24) {
-      trigger = 'silence';
-      hoursSinceLastOwn = hoursSinceUserMsg;
-      console.log(`[proactive-tick] → trigger=missing_him (silent ${hoursSinceUserMsg.toFixed(1)}h)`);
-    }
-  }
-
-  // 1. Morning
-  if (lastUser > lastOwn && lastUser > 0 && now - lastUser >= MORNING_SINCE_USER_MIN_MINUTES * 60_000) {
-    trigger = 'morning';
-    console.log(`[proactive-tick] → trigger=morning`);
-  }
-
-  // 2. Silence
-  if (!trigger && lastOwn > 0 && lastOwn >= lastUser && now - lastOwn >= SILENCE_HOURS_THRESHOLD * 3600_000) {
-    const roll = Math.random();
-    console.log(`[proactive-tick] silence check: roll=${roll.toFixed(3)} need<${SILENCE_CHANCE}`);
-    if (roll < SILENCE_CHANCE) {
-      trigger = 'silence';
-      hoursSinceLastOwn = (now - lastOwn) / 3600_000;
-    }
-  }
-
-  // 3. Random roll
-  if (!trigger) {
-    const chance = ROLL_CHANCE[localTime.mode];
-    const roll = Math.random();
-    console.log(`[proactive-tick] random check: mode=${localTime.mode} roll=${roll.toFixed(3)} need<${chance}`);
-    if (roll < chance) {
-      trigger = 'random';
-    }
-  }
-
   const nextRoll = new Date(now + ROLL_INTERVAL_HOURS * 3600_000).toISOString();
 
-  if (!trigger) {
-    console.log(`[proactive-tick] → no_trigger, next roll at ${nextRoll}`);
+  const writeRollOnly = async (reason: string) => {
     await supabase.from('user_girl_state').upsert({
       user_id: pair.user_id,
       girl_id: pair.girl_id,
       proactive_roll_at: nextRoll,
       updated_at: new Date().toISOString(),
     }, { onConflict: 'user_id,girl_id' });
-    return { ...baseResult, trigger: null, sent: false, reason: 'no_trigger' };
+    return { ...baseResult, trigger: null, sent: false, reason };
+  };
+
+  // ── Hard gate 1: ночь (sleep). Девушка не пишет, что бы ни было. ───────
+  if (localTime.mode === 'sleep') {
+    return writeRollOnly('girl_asleep');
+  }
+
+  const lastUser = pair.last_user_message_at ? new Date(pair.last_user_message_at).getTime() : 0;
+  const lastOwn = pair.last_assistant_message_at ? new Date(pair.last_assistant_message_at).getTime() : 0;
+  const lastProactive = pair.last_proactive_at ? new Date(pair.last_proactive_at).getTime() : 0;
+
+  const hoursSinceUserMsg = lastUser > 0 ? (now - lastUser) / 3600_000 : null;
+  const hoursSinceOwn = lastOwn > 0 ? (now - lastOwn) / 3600_000 : null;
+  const hoursSinceProactive = lastProactive > 0 ? (now - lastProactive) / 3600_000 : Infinity;
+
+  console.log(`[proactive-tick] ${tag} | user_msg=${hoursSinceUserMsg?.toFixed(1)}h own_msg=${hoursSinceOwn?.toFixed(1)}h proactive=${hoursSinceProactive === Infinity ? 'never' : hoursSinceProactive.toFixed(1)+'h'}`);
+
+  // ── Hard gate 2: ghosted. Юзер не отвечает >24ч после её сообщения → не добиваемся. ──
+  if (lastOwn > 0 && lastOwn >= lastUser && now - Math.max(lastOwn, lastUser) >= GHOSTED_HOURS_THRESHOLD * 3600_000) {
+    console.log(`[proactive-tick] ${tag} → user_ghosted, skipping`);
+    return writeRollOnly('user_ghosted');
+  }
+
+  // ── Hard gate 3: cooldown. Не чаще раза в 8-12 часов. ──────────────────
+  const cooldownH = effectiveCooldownHours(pair.user_id, pair.girl_id, localTime.localDate);
+  if (hoursSinceProactive < cooldownH) {
+    console.log(`[proactive-tick] ${tag} → cooldown (${hoursSinceProactive.toFixed(1)}h < ${cooldownH.toFixed(1)}h)`);
+    return writeRollOnly('cooldown');
+  }
+
+  let trigger: Trigger | null = null;
+  let hoursSinceLastOwn: number | undefined;
+
+  // ── Trigger 1: morning (real morning + slept-through gating) ───────────
+  // Срабатывает если:
+  //   • её локальный час 7..11
+  //   • её последнее сообщение было >=4ч назад (или его не было) — она реально спала
+  //   • юзер писал последним
+  //   • его последнее сообщение пришло когда у неё была ночь (sleep window)
+  if (
+    localTime.hour >= MORNING_HOUR_START &&
+    localTime.hour <= MORNING_HOUR_END &&
+    lastUser > lastOwn &&
+    lastUser > 0 &&
+    (lastOwn === 0 || (now - lastOwn) >= 4 * 3600_000) &&
+    pair.last_user_message_at && wasInSleepWindow(pair.last_user_message_at, timezone)
+  ) {
+    trigger = 'morning';
+    console.log(`[proactive-tick] ${tag} → trigger=morning (user wrote at night, she's now awake)`);
+  }
+
+  // ── Trigger 2: silence ─────────────────────────────────────────────────
+  // Её последнее сообщение >=24ч без ответа, юзер всё ещё «в зоне» (не ghosted),
+  // и cooldown уже прошёл (этот гейт выше).
+  if (!trigger && lastOwn > 0 && lastOwn >= lastUser && hoursSinceOwn !== null && hoursSinceOwn >= SILENCE_MIN_HOURS) {
+    trigger = 'silence';
+    hoursSinceLastOwn = hoursSinceOwn;
+    console.log(`[proactive-tick] ${tag} → trigger=silence (${hoursSinceOwn.toFixed(1)}h since her last msg)`);
+  }
+
+  // ── Trigger 3: slot ────────────────────────────────────────────────────
+  // Только в обозначенных «слотах дня». Шанс зависит от слота.
+  // Дополнительная гарантия: один слот → одна проактивка (по local date + slot id).
+  if (!trigger) {
+    const slot = currentDaySlot(localTime.hour);
+    if (slot) {
+      // Если в этом слоте сегодня уже была проактивка — пропускаем.
+      const slotMarker = `${localTime.localDate}|${slot.id}`;
+      const sameSlotAlready = lastProactive > 0
+        ? (() => {
+            const lastIso = new Date(lastProactive).toISOString();
+            // Маркер слота, в котором случилась прошлая проактивка, по её TZ
+            const lastLocalParts = new Intl.DateTimeFormat('en-GB', {
+              timeZone: timezone,
+              year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', hour12: false,
+            }).formatToParts(new Date(lastIso));
+            const get = (t: string) => lastLocalParts.find((p) => p.type === t)?.value ?? '';
+            const lastDate = `${get('year')}-${get('month')}-${get('day')}`;
+            const lastHour = Number(get('hour')) % 24;
+            const lastSlot = currentDaySlot(lastHour);
+            return lastSlot && `${lastDate}|${lastSlot.id}` === slotMarker;
+          })()
+        : false;
+
+      if (sameSlotAlready) {
+        console.log(`[proactive-tick] ${tag} → slot ${slot.id} already used today`);
+      } else {
+        // Детерминированный roll: фракция по (user, girl, slot_marker) < chance.
+        // Это значит: в течение слот-окна шанс срабатывания фиксирован (а не зависит от тика),
+        // и кубик не «передёргивается» каждые 15 минут — ответ детерминирован.
+        const roll = seededFraction(`${pair.user_id}|${pair.girl_id}|${slotMarker}`);
+        console.log(`[proactive-tick] ${tag} slot=${slot.id} roll=${roll.toFixed(3)} need<${slot.chance}`);
+        if (roll < slot.chance) {
+          trigger = 'slot';
+        }
+      }
+    }
+  }
+
+  if (!trigger) {
+    return writeRollOnly('no_trigger');
   }
 
   try {
@@ -423,19 +501,12 @@ async function processPair(
       { role: 'user', content: 'Напиши сообщение как описано выше. Только текст сообщения, без кавычек и префиксов.' },
     ], { temperature: 0.95, max_tokens: 220 });
 
-    console.log(`[proactive-tick] → sent to ${pair.user_id.slice(0,8)}/${pair.girl_id} trigger=${trigger}`);
+    console.log(`[proactive-tick] ${tag} → sent trigger=${trigger}`);
 
     if (!reply || reply.length < 2) {
-      await supabase.from('user_girl_state').upsert({
-        user_id: pair.user_id,
-        girl_id: pair.girl_id,
-        proactive_roll_at: nextRoll,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_id,girl_id' });
-      return { ...baseResult, trigger, sent: false, reason: 'empty_reply' };
+      return writeRollOnly('empty_reply');
     }
 
-    // Сохраняем как обычное сообщение ассистента — клиент подхватит по realtime.
     const nowIso = new Date().toISOString();
     await supabase.from('messages').insert({
       user_id: pair.user_id,
@@ -444,7 +515,6 @@ async function processPair(
       content: reply,
     });
 
-    // Уведомление (if есть таблица) — best effort.
     try {
       await supabase.from('notifications').insert({
         user_id: pair.user_id,
@@ -473,7 +543,6 @@ async function processPair(
     return { ...baseResult, trigger, sent: true };
   } catch (err) {
     console.error('[proactive-tick] pair error:', pair, err);
-    // Сдвигаем ролл всё равно, чтобы не зациклиться на битой паре.
     await supabase.from('user_girl_state').upsert({
       user_id: pair.user_id,
       girl_id: pair.girl_id,
