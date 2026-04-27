@@ -69,23 +69,25 @@ export function useToast() {
                 alignItems: 'center',
                 gap: 10,
                 padding: '12px 20px',
+                maxWidth: 'min(560px, calc(100vw - 32px))',
                 background: 'rgba(30,26,46,0.95)',
                 backdropFilter: 'blur(20px)',
                 border: `1px solid ${colors[toast.type]}33`,
-                borderRadius: 'var(--radius-full)',
+                borderRadius: 'var(--radius-lg)',
                 color: colors[toast.type],
                 fontSize: 'var(--text-sm)',
                 fontWeight: 500,
+                lineHeight: 1.4,
                 boxShadow: 'var(--shadow-lg)',
                 pointerEvents: 'auto',
                 cursor: 'pointer',
-                whiteSpace: 'nowrap',
+                textAlign: 'left',
               }}
               onClick={() => dismissToast(toast.id)}
             >
-              {icons[toast.type]}
-              {toast.message}
-              <X size={14} style={{ opacity: 0.5 }} />
+              {<span style={{ flexShrink: 0, display: 'inline-flex' }}>{icons[toast.type]}</span>}
+              <span style={{ flex: 1, minWidth: 0 }}>{toast.message}</span>
+              <X size={14} style={{ opacity: 0.5, flexShrink: 0 }} />
             </motion.div>
           ))}
         </AnimatePresence>

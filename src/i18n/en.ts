@@ -314,6 +314,16 @@ const en = {
       "Hold on, I'll be right back 😊",
     ],
     aiFallbackReply: 'Hmm, something went wrong... Write me again 💜',
+    // Toasts shown when user tries to send a second message before AI replied.
+    // Goal: gently teach to express the whole thought in one message.
+    waitingForReplyHints: [
+      'Let her speak. Real connections grow from listening, not from a flood of words.',
+      "Don't rush. Learn to put your thought into one message — it pays off in every relationship.",
+      'Wait for her reply. In a real conversation, hurry kills intimacy.',
+      'Good relationships are built on truly hearing each other. Wait for her.',
+      "Lumina isn't only about meeting someone. Listening is a skill that stays with you for life.",
+    ],
+    waitingForReplyStuck: 'Looks like she got lost in thought. Try again.',
     notificationsName: 'Notifications',
     notificationsPreview: 'Hello!...',
   },

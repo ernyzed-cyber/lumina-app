@@ -28,6 +28,7 @@ import { useTelegramVerified } from '../hooks/useTelegramVerified';
 import { useStars } from '../hooks/useStars';
 import { StarsBalance } from '../components/StarsBalance';
 import VerificationModal from '../components/VerificationModal';
+import { useToast } from '../hooks/useToast';
 import s from './Chat.module.css';
 
 /* ── Types ── */
@@ -44,11 +45,12 @@ const WARN_CHARS = 400;
 const DAILY_MESSAGE_LIMIT = 100;
 const MSG_LIMIT_KEY = 'dailyMsgLimits';
 // Hard timeout for the edge fetch — Supabase free edge can cold-start slowly.
-// Без этого fetch может висеть бесконечно и блокировать inflightRef навсегда.
+// Без этого fetch может висеть бесконечно и блокировать ввод навсегда.
 const EDGE_FETCH_TIMEOUT_MS = 45_000;
-// Watchdog: верхняя граница длительности одного AI-цикла (fetch + schedule + сегменты).
-// schedule может быть до ~210s в work-mode, плюс пара сегментов — даём 5 минут.
-const MAX_TURN_MS = 5 * 60_000;
+// Watchdog: верхняя граница ожидания ответа (fetch + schedule + сегменты).
+// schedule может быть до ~210s в work-mode, плюс пара сегментов — даём 180с.
+// По истечении: разблокируем ввод и показываем тост "она задумалась".
+const REPLY_WATCHDOG_MS = 180_000;
 
 
 /* ── Emoji data (emojis themselves are not translatable) ── */
@@ -94,6 +96,7 @@ function loadMsgLimits(): MsgLimits {
    ══════════════════════════════════════ */
 export default function Chat() {
   const { t, tr, lang } = useLanguage();
+  const { showToast, ToastContainer } = useToast();
   const { user, session, loading: authLoading } = useAuth();
   const { isVerified: telegramVerified } = useTelegramVerified();
   const { resetMessages } = useNotifications();
@@ -203,15 +206,14 @@ export default function Chat() {
   const messagesAreaRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const emojiPickerRef = useRef<HTMLDivElement>(null);
-  // Мьютекс против двойного ответа. Пока идёт текущий AI-цикл (fetch+schedule+сегменты),
-  // новые sendMessage добавляют user-бабл но НЕ стартуют параллельный fetch.
-  // По завершении цикла, если флаг выставлен — делаем ещё один цикл с обновлённым контекстом.
-  const inflightRef = useRef(false);
-  const queuedRef = useRef(false);
   const messagesRef = useRef<Message[]>([]);
-  // Watchdog: если runAiTurn застрял (cold start edge, network freeze) — насильно
-  // освобождаем мьютекс через MAX_TURN_MS, чтобы юзер не оказался "заперт".
-  const inflightStartRef = useRef<number>(0);
+  // Простой "wait for reply" режим: пока AI не ответил — отправлять нельзя.
+  // Решает кучу проблем (race-conditions с setMessages, потеря баблов,
+  // зависшие fetch'и) и одновременно учит юзера выражать мысль одним
+  // сообщением, а не спамить. Watchdog снимает блок если AI завис.
+  const [awaitingReply, setAwaitingReply] = useState(false);
+  // Индекс ротирующейся подсказки в waitingForReplyHints.
+  const hintIndexRef = useRef(0);
   const [emojiOpen, setEmojiOpen] = useState(false);
   const [verifyModalOpen, setVerifyModalOpen] = useState(false);
   const [giftPickerOpen, setGiftPickerOpen] = useState(false);
@@ -598,6 +600,18 @@ export default function Chat() {
       const content = (text ?? input).trim();
       if (!content || !currentGirl) return;
 
+      // Если AI ещё печатает / в процессе ответа — НЕ принимаем второе сообщение.
+      // Вместо этого мягко учим юзера не спамить: показываем ротирующуюся подсказку
+      // про "учись слушать". Send-кнопка disabled, но Enter мог сработать —
+      // плюс юзер мог жать кнопку (defensive check тут).
+      if (awaitingReply) {
+        const hints: string[] = tr.chat.waitingForReplyHints;
+        const hint = hints[hintIndexRef.current % hints.length];
+        hintIndexRef.current += 1;
+        showToast(hint, 'info');
+        return;
+      }
+
       // Check daily limit
       if (messagesLeft <= 0) {
         setLimitModal({ open: true, variant: 'daily_limit' });
@@ -622,51 +636,31 @@ export default function Chat() {
 
       saveMessage('user', content);
 
-      // Синхронно обновляем messagesRef, чтобы runAiTurn сразу видел этот бабл,
-      // даже если React ещё не успел прогнать эффект синхронизации.
+      // Зеркало для runAiTurn — он читает контекст из ref.
       messagesRef.current = [...messagesRef.current, userMsg];
-
-      // Если AI уже в процессе ответа (игнор/онлайн/печатает/сегменты) —
-      // НЕ стартуем параллельный fetch. Просто помечаем очередь:
-      // по завершении текущего цикла runAiTurn выполнится ещё раз с обновлённым контекстом.
-      if (inflightRef.current) {
-        // Watchdog: если предыдущий цикл «висит» дольше MAX_TURN_MS — насильно
-        // освобождаем мьютекс. Это страховка от ситуаций, когда fetch/await завис
-        // и не дошёл до finally (cold start edge, network freeze, browser throttling).
-        const stuckMs = Date.now() - inflightStartRef.current;
-        if (stuckMs > MAX_TURN_MS) {
-          console.warn('[Chat] inflight watchdog: previous turn stuck for', stuckMs, 'ms — releasing mutex');
-          inflightRef.current = false;
-          queuedRef.current = false;
-        } else {
-          queuedRef.current = true;
-          return;
-        }
-      }
 
       // Статус будет управляться расписанием с сервера:
       // фаза "игнор" (offline) → "в сети" (online) → "печатает" (typing) → ответ.
       setIsTyping(false);
       setLiveOnline(false);
 
-      inflightRef.current = true;
-      inflightStartRef.current = Date.now();
+      // Лочим инпут до прихода ответа. Watchdog снимет лок если runAiTurn
+      // зависнет дольше REPLY_WATCHDOG_MS (cold start edge, network freeze).
+      setAwaitingReply(true);
+      const watchdog = setTimeout(() => {
+        console.warn('[Chat] reply watchdog fired — releasing input lock');
+        setAwaitingReply(false);
+        showToast(t('chat.waitingForReplyStuck'), 'warning');
+      }, REPLY_WATCHDOG_MS);
+
       try {
-        do {
-          // Debounce: ждём 400мс, собирая все быстрые сообщения (подарки, эмодзи и т.п.)
-          // в messagesRef. ПОТОМ сбрасываем флаг — чтобы queuedRef=true, выставленный
-          // сообщениями за эти 400мс, не вызвал лишний второй цикл.
-          await new Promise((r) => setTimeout(r, 400));
-          queuedRef.current = false;
-          inflightStartRef.current = Date.now();
-          await runAiTurn();
-        } while (queuedRef.current);
+        await runAiTurn();
       } finally {
-        inflightRef.current = false;
-        inflightStartRef.current = 0;
+        clearTimeout(watchdog);
+        setAwaitingReply(false);
       }
     },
-    [input, currentGirl, saveMessage, messagesLeft, runAiTurn],
+    [input, currentGirl, awaitingReply, tr, t, showToast, saveMessage, messagesLeft, runAiTurn],
   );
 
   /* ── Enter to send ── */
@@ -998,9 +992,10 @@ export default function Chat() {
                   className={s.sendBtn}
                   onClick={() => sendMessage()}
                   disabled={(!input.trim() && !isTyping) || messagesLeft <= 0}
+                  data-waiting={awaitingReply || undefined}
                   aria-label={t('chat.sendAriaLabel')}
-                  whileTap={{ scale: 0.88 }}
-                  whileHover={{ scale: 1.08 }}
+                  whileTap={{ scale: awaitingReply ? 1 : 0.88 }}
+                  whileHover={{ scale: awaitingReply ? 1 : 1.08 }}
                   transition={{ type: 'spring', stiffness: 500, damping: 20 }}
                 >
                   <Send size={20} />
@@ -1099,6 +1094,8 @@ export default function Chat() {
         open={verifyModalOpen}
         onClose={() => setVerifyModalOpen(false)}
       />
+
+      <ToastContainer />
     </PageTransition>
   );
 }

@@ -872,6 +872,20 @@
   cursor: default;
 }
 
+/* AI ещё печатает — кнопка активна (клик показывает философский тост),
+   но визуально приглушена, чтобы не приглашать к спаму. */
+.sendBtn[data-waiting] {
+  background: var(--bg-elevated);
+  color: var(--text-secondary);
+  box-shadow: none;
+  opacity: 0.6;
+}
+.sendBtn[data-waiting]:hover {
+  transform: none;
+  box-shadow: none;
+  opacity: 0.75;
+}
+
 /* ══════════════════════════════════════
    ПРАВАЯ ПАНЕЛЬ — Профиль
    ══════════════════════════════════════ */
