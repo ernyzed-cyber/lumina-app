@@ -580,7 +580,7 @@ export default function Chat() {
         }
       }
 
-      setTimeout(() => setLiveOnline(false), 120_000);
+      setTimeout(() => setLiveOnline(false), 300_000);
     } catch (err) {
       console.error('[chat-ai] fallback triggered:', err);
       const fallbackReplies: string[] = tr.chat.fallbackReplies;
@@ -599,7 +599,7 @@ export default function Chat() {
       };
       setMessages((prev) => [...prev, aiMsg]);
       saveMessage('assistant', fallback);
-      setTimeout(() => setLiveOnline(false), 30_000);
+      setTimeout(() => setLiveOnline(false), 300_000);
     } finally {
       clearTimeout(abortTimer);
       setTimeout(() => setIsTyping(false), 400);
