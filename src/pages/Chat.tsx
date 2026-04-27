@@ -241,32 +241,52 @@ export default function Chat() {
   /* ── Select girl from assignment ── */
   // Если нет активного assignment → показываем EmptyState (см. ниже в return), НЕ редиректим
 
-  // Установить currentGirl из activeGirlId
+  // Установить currentGirl из activeGirlId.
+  // ВАЖНО: getLocalizedGirlById возвращает НОВЫЙ объект при каждом вызове (через localize()).
+  // Если делать setCurrentGirl(found) безусловно — каждый ре-рендер где меняется lang
+  // или просто прокидывается новая ссылка из useAssignment пересоздаёт currentGirl,
+  // что триггерит useEffect загрузки сообщений ниже и ЗАТИРАЕТ свежедобавленные баблы
+  // (включая только что отправленный AI-ответ). Поэтому обновляем только если
+  // реально сменился id или язык контента.
   useEffect(() => {
-    if (activeGirlId) {
-      const found = getLocalizedGirlById(lang, activeGirlId);
-      if (found) setCurrentGirl(found);
+    if (!activeGirlId) {
+      setCurrentGirl(null);
+      return;
     }
+    const found = getLocalizedGirlById(lang, activeGirlId);
+    if (!found) return;
+    setCurrentGirl((prev) => {
+      // Если id и язык-зависимое имя совпали — возвращаем предыдущий объект (стабильная ссылка).
+      if (prev && prev.id === found.id && prev.name === found.name) return prev;
+      return found;
+    });
   }, [activeGirlId, lang]);
 
 
 
-  /* ── Load messages from Supabase ── */
+  /* ── Load messages from Supabase ──
+     ВАЖНО: зависит от user?.id и currentGirl?.id (примитивов), а не от объектов.
+     Иначе любое пересоздание объекта user/currentGirl (новая ссылка при ре-локализации,
+     refetch useAssignment, обновление токена сессии) триггерит перезагрузку сообщений
+     и ЗАТИРАЕТ только что добавленные через setMessages баблы — в т.ч. AI-ответ,
+     который ещё не успел дойти до БД. */
+  const userId = user?.id;
+  const girlId = currentGirl?.id;
   useEffect(() => {
-    if (!user || !currentGirl) return;
+    if (!userId || !girlId) return;
 
     let cancelled = false;
     async function load() {
       setLoadingMessages(true);
-      console.log('[Chat] loadMessages START', { userId: user!.id, girlId: currentGirl!.id });
+      console.log('[Chat] loadMessages START', { userId, girlId });
       try {
         // ВАЖНО: берём ПОСЛЕДНИЕ 200 сообщений, а не первые.
         // Сортируем DESC + limit, потом разворачиваем в UI-порядок (старые сверху, новые снизу).
         const { data, error } = await supabase
           .from('messages')
           .select('id, role, content, created_at')
-          .eq('user_id', user!.id)
-          .eq('girl_id', currentGirl!.id)
+          .eq('user_id', userId)
+          .eq('girl_id', girlId)
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
           .limit(200);
@@ -304,7 +324,7 @@ export default function Chat() {
 
     load();
     return () => { cancelled = true; };
-  }, [user, currentGirl]);
+  }, [userId, girlId]);
 
   /* ── Auto-scroll ──
      Поведение:
