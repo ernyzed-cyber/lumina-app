@@ -546,11 +546,30 @@ export default function Chat() {
       };
       console.log('[runAiTurn] schedule', schedule, 'replyLen:', replyFull.length);
 
+      // СТРАХОВКА: сохраняем reply в БД сразу, до setTimeout-цепочки.
+      // Если что-то убьёт таймеры (вкладка засыпает, ремоунт, mobile bg throttle),
+      // сообщение всё равно появится при следующей загрузке Chat.
+      // В UI добавляем segments позже по расписанию — БД-id'ы дедуплицируются
+      // при reload, т.к. UI-баблы имеют локальные genId().
+      const segmentsForDb = replyFull
+        .split(/\n{2,}/)
+        .map((str) => str.trim())
+        .filter(Boolean)
+        .slice(0, 3);
+      console.log('[runAiTurn] persisting', segmentsForDb.length, 'segments to DB now');
+      for (const seg of segmentsForDb) {
+        saveMessage('assistant', seg);
+      }
+
+      console.log('[runAiTurn] phase=ignore start, waiting', schedule.ignoreMs, 'ms');
       await new Promise((r) => setTimeout(r, schedule.ignoreMs));
+      console.log('[runAiTurn] phase=ignore done → setLiveOnline(true)');
       setLiveOnline(true);
       await new Promise((r) => setTimeout(r, schedule.onlineMs));
+      console.log('[runAiTurn] phase=online done → setIsTyping(true)');
       setIsTyping(true);
       await new Promise((r) => setTimeout(r, schedule.typingMs));
+      console.log('[runAiTurn] phase=typing done → emitting segments');
       setIsTyping(false);
 
       const segments = replyFull
@@ -558,11 +577,24 @@ export default function Chat() {
         .map((str) => str.trim())
         .filter(Boolean)
         .slice(0, 3);
+      console.log('[runAiTurn] segments count:', segments.length);
 
       const paceDelay = (tx: string) => Math.min(600 + tx.length * 25, 2800);
 
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
+        console.log('[runAiTurn] emit segment', i + 1, '/', segments.length);
+
+        // Дедуп: если этот сегмент уже есть в messages (подтянулся из БД при
+        // reload во время задержки) — не добавляем повторно в UI.
+        const alreadyShown = messagesRef.current.some(
+          (m) => m.role === 'assistant' && m.content === seg,
+        );
+        if (alreadyShown) {
+          console.log('[runAiTurn] segment already in UI (loaded from DB) — skip');
+          continue;
+        }
+
         const aiMsg: Message = {
           id: genId(),
           role: 'assistant',
@@ -570,7 +602,7 @@ export default function Chat() {
           timestamp: new Date(),
         };
         setMessages((prev) => [...prev, aiMsg]);
-        saveMessage('assistant', seg);
+        // saveMessage уже вызван выше для всех сегментов — не дублируем.
 
         if (i < segments.length - 1) {
           setIsTyping(true);
@@ -601,6 +633,7 @@ export default function Chat() {
       saveMessage('assistant', fallback);
       setTimeout(() => setLiveOnline(false), 300_000);
     } finally {
+      console.log('[runAiTurn] FINALLY');
       clearTimeout(abortTimer);
       setTimeout(() => setIsTyping(false), 400);
     }
