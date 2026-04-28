@@ -9,7 +9,7 @@ import { motion, AnimatePresence } from 'framer-motion';import {
   Gift,
   ChevronDown,
 } from 'lucide-react';
-import { getLocalizedGirlById, type Girl } from '../data/girls';
+import { getLocalizedGirlById, isGirlAsleep, type Girl } from '../data/girls';
 import { useAuth } from '../hooks/useAuth';
 import { useNotifications } from '../hooks/useNotifications';
 import { useAssignment } from '../hooks/useAssignment';
@@ -89,6 +89,30 @@ function loadMsgLimits(): MsgLimits {
   const saved = storage.load<MsgLimits>(MSG_LIMIT_KEY, null);
   if (!saved || saved.date !== getTodayStr()) return { count: 0, date: getTodayStr() };
   return saved;
+}
+
+/**
+ * Ночной лимит сообщений. Когда она спит — даём 3 «попытки разбудить»,
+ * после чего блокируем отправку до утра. Хранится в localStorage пер-girl-per-date.
+ */
+const NIGHT_ATTEMPTS_KEY_PREFIX = 'night_attempts:';
+const NIGHT_ATTEMPTS_LIMIT = 3;
+function getNightAttempts(girlId: string): number {
+  try {
+    const raw = localStorage.getItem(`${NIGHT_ATTEMPTS_KEY_PREFIX}${girlId}:${getTodayStr()}`);
+    return raw ? Number(raw) || 0 : 0;
+  } catch {
+    return 0;
+  }
+}
+function bumpNightAttempts(girlId: string): number {
+  const next = getNightAttempts(girlId) + 1;
+  try {
+    localStorage.setItem(`${NIGHT_ATTEMPTS_KEY_PREFIX}${girlId}:${getTodayStr()}`, String(next));
+  } catch {
+    // ignore quota
+  }
+  return next;
 }
 
 /* ══════════════════════════════════════
@@ -289,11 +313,14 @@ export default function Chat() {
       try {
         // ВАЖНО: берём ПОСЛЕДНИЕ 200 сообщений, а не первые.
         // Сортируем DESC + limit, потом разворачиваем в UI-порядок (старые сверху, новые снизу).
+        // Фильтр visible_at <= now() — иллюзия живого ответа: сообщение Алины,
+        // запланированное в будущее, не подтянется при reload и не "заспойлерит" ответ.
         const { data, error } = await supabase
           .from('messages')
-          .select('id, role, content, created_at')
+          .select('id, role, content, created_at, visible_at')
           .eq('user_id', userId)
           .eq('girl_id', girlId)
+          .lte('visible_at', new Date().toISOString())
           .order('created_at', { ascending: false })
           .order('id', { ascending: false })
           .limit(200);
@@ -446,15 +473,23 @@ export default function Chat() {
 
   /* ── Save message to Supabase ── */
   const saveMessage = useCallback(
-    async (role: 'user' | 'assistant', content: string) => {
+    async (role: 'user' | 'assistant', content: string, visibleAt?: Date) => {
       if (!user || !currentGirl) return;
       try {
-        const { error } = await supabase.from('messages').insert({
+        const row: {
+          user_id: string;
+          girl_id: string;
+          role: 'user' | 'assistant';
+          content: string;
+          visible_at?: string;
+        } = {
           user_id: user.id,
           girl_id: currentGirl.id,
           role,
           content,
-        });
+        };
+        if (visibleAt) row.visible_at = visibleAt.toISOString();
+        const { error } = await supabase.from('messages').insert(row);
         if (error) {
           console.error('[Chat] saveMessage error:', error);
         }
@@ -546,19 +581,34 @@ export default function Chat() {
       };
       console.log('[runAiTurn] schedule', schedule, 'replyLen:', replyFull.length);
 
-      // СТРАХОВКА: сохраняем reply в БД сразу, до setTimeout-цепочки.
-      // Если что-то убьёт таймеры (вкладка засыпает, ремоунт, mobile bg throttle),
-      // сообщение всё равно появится при следующей загрузке Chat.
-      // В UI добавляем segments позже по расписанию — БД-id'ы дедуплицируются
-      // при reload, т.к. UI-баблы имеют локальные genId().
+      // СТРАХОВКА + UX-иллюзия: сохраняем reply в БД сразу, но с visible_at
+      // в будущем. loadMessages фильтрует по visible_at <= now() — поэтому
+      // reload во время фазы ignore/online/typing НЕ заспойлерит ответ.
+      // Когда время наступает — сообщение становится видимым; локальные
+      // setTimeout добавляют его в UI в тот же момент через setMessages.
+      // Если таймеры умрут — при следующем reload сообщение подтянется из БД.
       const segmentsForDb = replyFull
         .split(/\n{2,}/)
         .map((str) => str.trim())
         .filter(Boolean)
         .slice(0, 3);
-      console.log('[runAiTurn] persisting', segmentsForDb.length, 'segments to DB now');
-      for (const seg of segmentsForDb) {
-        saveMessage('assistant', seg);
+
+      const paceDelayMs = (tx: string) => Math.min(600 + tx.length * 25, 2800);
+      const baseDelayMs = schedule.ignoreMs + schedule.onlineMs + schedule.typingMs;
+      const sendStart = Date.now();
+      // Cumulative offset для каждого сегмента: первый = baseDelay, далее +pace.
+      let cumulative = baseDelayMs;
+      const segmentVisibleAt: Date[] = [];
+      for (let i = 0; i < segmentsForDb.length; i++) {
+        segmentVisibleAt.push(new Date(sendStart + cumulative));
+        if (i < segmentsForDb.length - 1) {
+          cumulative += paceDelayMs(segmentsForDb[i + 1]) + 250;
+        }
+      }
+
+      console.log('[runAiTurn] persisting', segmentsForDb.length, 'segments to DB with visible_at');
+      for (let i = 0; i < segmentsForDb.length; i++) {
+        saveMessage('assistant', segmentsForDb[i], segmentVisibleAt[i]);
       }
 
       console.log('[runAiTurn] phase=ignore start, waiting', schedule.ignoreMs, 'ms');
@@ -572,21 +622,15 @@ export default function Chat() {
       console.log('[runAiTurn] phase=typing done → emitting segments');
       setIsTyping(false);
 
-      const segments = replyFull
-        .split(/\n{2,}/)
-        .map((str) => str.trim())
-        .filter(Boolean)
-        .slice(0, 3);
+      const segments = segmentsForDb;
       console.log('[runAiTurn] segments count:', segments.length);
-
-      const paceDelay = (tx: string) => Math.min(600 + tx.length * 25, 2800);
 
       for (let i = 0; i < segments.length; i++) {
         const seg = segments[i];
         console.log('[runAiTurn] emit segment', i + 1, '/', segments.length);
 
         // Дедуп: если этот сегмент уже есть в messages (подтянулся из БД при
-        // reload во время задержки) — не добавляем повторно в UI.
+        // reload — например visible_at уже наступил) — не добавляем повторно.
         const alreadyShown = messagesRef.current.some(
           (m) => m.role === 'assistant' && m.content === seg,
         );
@@ -606,7 +650,7 @@ export default function Chat() {
 
         if (i < segments.length - 1) {
           setIsTyping(true);
-          await new Promise((r) => setTimeout(r, paceDelay(segments[i + 1])));
+          await new Promise((r) => setTimeout(r, paceDelayMs(segments[i + 1])));
           setIsTyping(false);
           await new Promise((r) => setTimeout(r, 250));
         }
@@ -654,6 +698,21 @@ export default function Chat() {
         hintIndexRef.current += 1;
         showToast(hint, 'info');
         return;
+      }
+
+      // Ночной лимит. Если она спит в её timezone:
+      //   • первые NIGHT_ATTEMPTS_LIMIT попыток — мягкое предупреждение «она спит»,
+      //     но сообщение всё-таки уходит (edge сгенерирует ответ с visible_at утром).
+      //   • дальше — жёсткий блок: уважение к её личному пространству.
+      if (currentGirl.sleepSchedule && isGirlAsleep(currentGirl.sleepSchedule)) {
+        const attempts = getNightAttempts(currentGirl.id);
+        if (attempts >= NIGHT_ATTEMPTS_LIMIT) {
+          showToast(t('chat.nightHardBlock'), 'warning');
+          return;
+        }
+        bumpNightAttempts(currentGirl.id);
+        showToast(t('chat.nightSoftHint'), 'info');
+        // продолжаем отправку
       }
 
       // Check daily limit

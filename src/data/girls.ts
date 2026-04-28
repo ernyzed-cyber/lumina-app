@@ -27,6 +27,19 @@ export interface LookingFor {
   ageMax: number;
 }
 
+/**
+ * Расписание сна. Часы в её timezone (0..23).
+ * Если sleepStart=1 и sleepEnd=7 — спит 01:00–07:00.
+ * Используется для UX-предупреждений на клиенте (ночной лимит сообщений).
+ * Серверная логика edge-функции пока использует фиксированное окно 01:00–07:00.
+ */
+export interface SleepSchedule {
+  start: number; // hour (0..23) when she goes to sleep
+  end: number;   // hour (0..23) when she wakes up
+  /** IANA timezone name, e.g. "Europe/Moscow". */
+  timezone: string;
+}
+
 export interface Lifestyle {
   work: I18nStr;
   children: Children;
@@ -70,6 +83,8 @@ interface GirlData {
   interests: I18nStr[];
   nationality: string;    // flag emoji e.g. "\uD83C\uDDF7\uD83C\uDDFA"
   compatibility: number;  // 0-100 %
+  /** Optional sleep window per persona. Defaults applied via getLocalizedGirlById. */
+  sleepSchedule?: SleepSchedule;
 }
 
 /** Public interface consumed by pages — plain strings, language-resolved */
@@ -105,6 +120,7 @@ export interface Girl {
   interests: string[];
   nationality: string;
   compatibility: number;
+  sleepSchedule: SleepSchedule;
 }
 
 // ---------------------------------------------------------------------------
@@ -741,7 +757,36 @@ function localize(data: GirlData, lang: Lang): Girl {
     interests: data.interests.map(i => i[lang]),
     nationality: data.nationality,
     compatibility: data.compatibility,
+    sleepSchedule: data.sleepSchedule ?? DEFAULT_SLEEP_SCHEDULE,
   };
+}
+
+/**
+ * Default sleep schedule applied to personas without explicit override.
+ * 01:00–07:00 Moscow time matches the server-side fixed window in chat-ai.
+ */
+const DEFAULT_SLEEP_SCHEDULE: SleepSchedule = {
+  start: 1,
+  end: 7,
+  timezone: 'Europe/Moscow',
+};
+
+/**
+ * Returns true if the given timestamp falls inside the girl's sleep window.
+ * Handles wrap-around windows (start > end, e.g. 23..7).
+ */
+export function isGirlAsleep(schedule: SleepSchedule, at: Date = new Date()): boolean {
+  const parts = new Intl.DateTimeFormat('en-GB', {
+    timeZone: schedule.timezone,
+    hour: '2-digit',
+    hour12: false,
+  }).formatToParts(at);
+  const hour = Number(parts.find(p => p.type === 'hour')?.value ?? 0) % 24;
+  if (schedule.start <= schedule.end) {
+    return hour >= schedule.start && hour < schedule.end;
+  }
+  // wrap-around (e.g. 23..7)
+  return hour >= schedule.start || hour < schedule.end;
 }
 
 /** Get all girls localized to the given language */

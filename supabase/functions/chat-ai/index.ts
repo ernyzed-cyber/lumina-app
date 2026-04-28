@@ -66,13 +66,23 @@ function isInterestingTopic(text: string): boolean {
   return false;
 }
 
-function computeSchedule(mode: DayMode, lastUserText: string, replyText: string): ReplySchedule {
+function computeSchedule(
+  mode: DayMode,
+  lastUserText: string,
+  replyText: string,
+  msUntilWake = 0,
+): ReplySchedule {
   const interesting = isInterestingTopic(lastUserText);
 
   // Базовые диапазоны задержки "игнора" перед тем как она "заметила".
   // В мс.
   let ignoreRange: [number, number];
-  if (mode === 'work') {
+  if (mode === 'sleep') {
+    // Спит. Игнор = время до пробуждения + 5..90 мин «утренней раскачки»
+    // (умылась, кофе, потом наконец взяла телефон).
+    const morningJitter = rand(5 * 60_000, 90 * 60_000);
+    ignoreRange = [msUntilWake + morningJitter, msUntilWake + morningJitter];
+  } else if (mode === 'work') {
     ignoreRange = interesting ? [45_000, 2 * 60_000] : [3 * 60_000, 8 * 60_000];
   } else {
     // rest
@@ -566,9 +576,11 @@ Deno.serve(async (req: Request) => {
         mode: localTime.mode,
       });
 
-      // SLEEP: она спит. Не зовём Grok вообще, не шлём никакой реплики,
-      // не меняем статус в UI. Сообщение юзера клиент уже сохранил в БД —
-      // утром проактивный тик разбудит диалог.
+      // SLEEP: она спит. Раньше тут был ранний return без ответа. Теперь
+       // генерируем ответ как обычно (модель получит пометку "ты только
+       // проснулась, сонная"), но клиент покажет его утром — visible_at
+       // задаётся через очень большой ignoreMs до 07:00 её timezone.
+       // Дополнительно: проактивная утренняя логика всё ещё работает.
       if (localTime.mode === 'sleep') {
         // Обновим last_user_message_at, чтобы проактивность знала что есть непрочитанное.
         const nowIso = new Date().toISOString();
@@ -580,14 +592,8 @@ Deno.serve(async (req: Request) => {
           status_until: null,
           updated_at: nowIso,
         }, { onConflict: 'user_id,girl_id' });
-
-        return json(200, {
-          reply: null,
-          skipped: 'sleep',
-          mode: 'sleep',
-          city,
-          local_time: localTime.human,
-        });
+        // Не делаем return — продолжаем генерацию. Schedule ниже сам поставит
+        // огромный ignoreMs (computeSchedule учитывает sleep mode).
       }
 
       if (personaPrompt) {
@@ -657,7 +663,23 @@ Deno.serve(async (req: Request) => {
 
     // Расписание показа ответа на клиенте (имитация живого собеседника).
     const lastUserText = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
-    const schedule = computeSchedule(dayMode, lastUserText, reply);
+
+    // Если она спит — считаем сколько мс до 07:00 её timezone.
+    let msUntilWake = 0;
+    if (dayMode === 'sleep' && timezone) {
+      // localTime.hour в её TZ. Если 02:00 — до 07:00 пять часов.
+      // Если 06:30 — полчаса. Точное значение в минутах: (7*60 - hour*60 - minute).
+      // minute не было в localTime — пересчитаем по iso "...THH:MM:00".
+      const localHour = localTime.hour;
+      const localMinuteMatch = localTime.iso.match(/T\d{2}:(\d{2}):/);
+      const localMinute = localMinuteMatch ? Number(localMinuteMatch[1]) : 0;
+      const minutesSinceMidnight = localHour * 60 + localMinute;
+      const wakeMinutes = 7 * 60; // 07:00
+      const minutesUntil = wakeMinutes - minutesSinceMidnight;
+      msUntilWake = Math.max(0, minutesUntil) * 60_000;
+    }
+
+    const schedule = computeSchedule(dayMode, lastUserText, reply, msUntilWake);
 
     if (girlId && userId) {
       // Запоминаем состояние пары: сообщение пришло, начинается фаза "игнора".

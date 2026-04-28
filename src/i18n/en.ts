@@ -324,6 +324,9 @@ const en = {
       "Lumina isn't only about meeting someone. Listening is a skill that stays with you for life.",
     ],
     waitingForReplyStuck: 'Looks like she got lost in thought. Try again.',
+    // Night limit: respect her personal space when she's asleep.
+    nightSoftHint: "It's nighttime where she is. She's probably asleep — she'll reply when she wakes up.",
+    nightHardBlock: "Enough. She's sleeping — respect her personal space and don't try to wake her. Write in the morning.",
     notificationsName: 'Notifications',
     notificationsPreview: 'Hello!...',
   },
