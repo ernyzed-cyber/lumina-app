@@ -115,6 +115,70 @@ function bumpNightAttempts(girlId: string): number {
   return next;
 }
 
+/* ── Pending reply persistence ──
+   Когда AI отдал ответ, мы рассчитываем когда он должен появиться у юзера
+   (фазы ignore → online → typing → каждый сегмент). На случай reload/закрытия
+   вкладки мы persist'им это расписание в localStorage, чтобы после возвращения:
+     1. показать корректный статус ("в сети" / "печатает") вместо "была недавно";
+     2. перезапустить таймеры до visible_at последнего сегмента;
+     3. дотянуть сегменты из БД когда их visible_at наступит.
+
+   TTL: запись автоматически считается невалидной если lastSegmentAt < now() - 5 min. */
+interface PendingReply {
+  /** Когда AI получил ответ от edge (Date.now() при создании). */
+  startedAt: number;
+  /** Конец фазы ignore (когда статус должен стать "в сети"). */
+  onlineAt: number;
+  /** Конец фазы online (когда должен появиться typing-индикатор). */
+  typingAt: number;
+  /** visible_at каждого сегмента ответа — когда сегмент появляется в чате. */
+  segmentVisibleAt: number[];
+}
+const PENDING_REPLY_PREFIX = 'pendingReply:';
+const PENDING_REPLY_TTL_MS = 5 * 60_000; // 5 min после lastSegmentAt считается мёртвой записью
+
+function pendingReplyKey(userId: string, girlId: string): string {
+  return `${PENDING_REPLY_PREFIX}${userId}:${girlId}`;
+}
+function savePendingReply(userId: string, girlId: string, p: PendingReply): void {
+  try {
+    localStorage.setItem(pendingReplyKey(userId, girlId), JSON.stringify(p));
+  } catch {
+    // ignore quota
+  }
+}
+function loadPendingReply(userId: string, girlId: string): PendingReply | null {
+  try {
+    const raw = localStorage.getItem(pendingReplyKey(userId, girlId));
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as PendingReply;
+    if (
+      typeof parsed.startedAt !== 'number' ||
+      typeof parsed.onlineAt !== 'number' ||
+      typeof parsed.typingAt !== 'number' ||
+      !Array.isArray(parsed.segmentVisibleAt)
+    ) {
+      return null;
+    }
+    const lastSegmentAt = parsed.segmentVisibleAt[parsed.segmentVisibleAt.length - 1] ?? parsed.typingAt;
+    if (Date.now() > lastSegmentAt + PENDING_REPLY_TTL_MS) {
+      // запись устарела — чистим
+      localStorage.removeItem(pendingReplyKey(userId, girlId));
+      return null;
+    }
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+function clearPendingReply(userId: string, girlId: string): void {
+  try {
+    localStorage.removeItem(pendingReplyKey(userId, girlId));
+  } catch {
+    // ignore
+  }
+}
+
 /* ══════════════════════════════════════
    COMPONENT: Chat
    ══════════════════════════════════════ */
@@ -302,23 +366,23 @@ export default function Chat() {
      который ещё не успел дойти до БД. */
   const userId = user?.id;
   const girlId = currentGirl?.id;
-  useEffect(() => {
-    console.log('[Chat] loadMessages effect triggered', { userId, girlId });
-    if (!userId || !girlId) return;
 
-    let cancelled = false;
-    async function load() {
+  /**
+   * Загрузка истории сообщений из БД с фильтром visible_at <= now().
+   * Вынесена в useCallback, чтобы её можно было дёргать повторно
+   * (например, после наступления visible_at у запланированного сегмента,
+   * чтобы он подтянулся в UI без полного reload).
+   *
+   * cancelledRef — внешний "флаг отмены"; передаётся из effect'а, который
+   * управляет жизненным циклом загрузки. Если ref.current=true — результат
+   * игнорируется (защита от race при перемонтировании / смене girlId).
+   */
+  const loadMessages = useCallback(
+    async (cancelledRef?: { current: boolean }) => {
+      if (!userId || !girlId) return;
       setLoadingMessages(true);
       console.log('[Chat] loadMessages START', { userId, girlId });
       try {
-        // ВАЖНО: берём ПОСЛЕДНИЕ 200 сообщений, а не первые.
-        // Сортируем DESC + limit, потом разворачиваем в UI-порядок (старые сверху, новые снизу).
-        // Фильтр visible_at <= now() — иллюзия живого ответа: сообщение Алины,
-        // запланированное в будущее, не подтянется при reload и не "заспойлерит" ответ.
-        //
-        // GRACEFUL FALLBACK: если миграция visible_at ещё не применена в БД —
-        // PostgREST вернёт 42703 ("column does not exist"). В этом случае
-        // повторяем запрос без visible_at, чтобы чат продолжал работать.
         let data: Array<{ id: string | number; role: string; content: string; created_at: string }> | null = null;
 
         const withVisible = await supabase
@@ -332,7 +396,6 @@ export default function Chat() {
           .limit(200);
 
         if (withVisible.error) {
-          // 42703 = undefined_column. Любая другая ошибка — реальная проблема, репортим.
           if (withVisible.error.code === '42703') {
             console.warn('[Chat] visible_at column missing — falling back to plain select. Apply the migration.');
             const fallback = await supabase
@@ -362,10 +425,10 @@ export default function Chat() {
           count: ordered.length,
           first: ordered[0]?.created_at,
           last: ordered[ordered.length - 1]?.created_at,
-          cancelled,
+          cancelled: cancelledRef?.current,
         });
 
-        if (!cancelled) {
+        if (!cancelledRef?.current) {
           setMessages(
             ordered.map((row: { id: string | number; role: string; content: string; created_at: string }) => ({
               id: String(row.id),
@@ -378,13 +441,103 @@ export default function Chat() {
       } catch (e) {
         console.error('[Chat] loadMessages exception:', e);
       } finally {
-        if (!cancelled) setLoadingMessages(false);
+        if (!cancelledRef?.current) setLoadingMessages(false);
       }
+    },
+    [userId, girlId],
+  );
+
+  useEffect(() => {
+    console.log('[Chat] loadMessages effect triggered', { userId, girlId });
+    if (!userId || !girlId) return;
+    const cancelledRef = { current: false };
+    loadMessages(cancelledRef);
+    return () => { cancelledRef.current = true; };
+  }, [userId, girlId, loadMessages]);
+
+  /* ── Restore pending reply after reload ──
+     Если до перезагрузки AI был "в процессе" (есть запись в localStorage с
+     запланированными visibleAt в будущем) — восстанавливаем UX:
+       • статус "в сети"/"печатает" по текущей фазе;
+       • блокируем ввод (awaitingReply);
+       • запускаем оставшиеся таймеры до visible_at каждого сегмента,
+         после чего перечитываем сообщения из БД (сегмент уже там).
+     Эффект работает только после загрузки текущего girl — иначе мы
+     не знаем чьи pending восстанавливать. */
+  useEffect(() => {
+    if (!userId || !girlId) return;
+    const pending = loadPendingReply(userId, girlId);
+    if (!pending) return;
+
+    const now = Date.now();
+    const lastSegmentAt =
+      pending.segmentVisibleAt[pending.segmentVisibleAt.length - 1] ?? pending.typingAt;
+
+    // Если все сегменты уже должны быть видны — просто чистим запись.
+    // loadMessages уже отработал и подтянул их (visible_at <= now).
+    if (now >= lastSegmentAt) {
+      clearPendingReply(userId, girlId);
+      return;
     }
 
-    load();
-    return () => { cancelled = true; };
-  }, [userId, girlId]);
+    console.log('[Chat] restoring pending reply', {
+      now,
+      onlineAt: pending.onlineAt,
+      typingAt: pending.typingAt,
+      lastSegmentAt,
+    });
+
+    // Блокируем ввод — AI ещё "думает".
+    awaitingReplyRef.current = true;
+    setAwaitingReply(true);
+
+    // Восстанавливаем UI-фазу.
+    if (now >= pending.onlineAt) setLiveOnline(true);
+    if (now >= pending.typingAt && now < lastSegmentAt) setIsTyping(true);
+
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    const scheduleAt = (atMs: number, fn: () => void) => {
+      const delay = Math.max(0, atMs - Date.now());
+      timers.push(setTimeout(fn, delay));
+    };
+
+    // Phase boundaries.
+    if (now < pending.onlineAt) {
+      scheduleAt(pending.onlineAt, () => setLiveOnline(true));
+    }
+    if (now < pending.typingAt) {
+      scheduleAt(pending.typingAt, () => setIsTyping(true));
+    }
+
+    // Каждый будущий сегмент: при наступлении visible_at перечитываем БД.
+    // typing-индикатор гасим за 250 мс до сегмента (как в runAiTurn).
+    for (let i = 0; i < pending.segmentVisibleAt.length; i++) {
+      const segAt = pending.segmentVisibleAt[i];
+      if (segAt <= now) continue;
+      scheduleAt(segAt - 250, () => setIsTyping(false));
+      scheduleAt(segAt, () => {
+        loadMessages();
+        // между сегментами снова показываем typing
+        if (i < pending.segmentVisibleAt.length - 1) {
+          setIsTyping(true);
+        }
+      });
+    }
+
+    // После последнего сегмента: снимаем awaitingReply и чистим.
+    scheduleAt(lastSegmentAt + 300, () => {
+      setIsTyping(false);
+      awaitingReplyRef.current = false;
+      setAwaitingReply(false);
+      clearPendingReply(userId, girlId);
+      // online ещё держим 5 минут как в обычном flow.
+      timers.push(setTimeout(() => setLiveOnline(false), 300_000));
+    });
+
+    return () => {
+      timers.forEach(clearTimeout);
+    };
+  }, [userId, girlId, loadMessages]);
 
   /* ── Auto-scroll ──
      Поведение:
@@ -647,6 +800,17 @@ export default function Chat() {
         saveMessage('assistant', segmentsForDb[i], segmentVisibleAt[i]);
       }
 
+      // Persist расписание в localStorage — чтобы reload/закрытие вкладки не
+      // сломали illusion. Восстановление в effect'е ниже.
+      if (user?.id && currentGirl?.id) {
+        savePendingReply(user.id, currentGirl.id, {
+          startedAt: sendStart,
+          onlineAt: sendStart + schedule.ignoreMs,
+          typingAt: sendStart + schedule.ignoreMs + schedule.onlineMs,
+          segmentVisibleAt: segmentVisibleAt.map((d) => d.getTime()),
+        });
+      }
+
       console.log('[runAiTurn] phase=ignore start, waiting', schedule.ignoreMs, 'ms');
       await new Promise((r) => setTimeout(r, schedule.ignoreMs));
       console.log('[runAiTurn] phase=ignore done → setLiveOnline(true)');
@@ -716,6 +880,11 @@ export default function Chat() {
       console.log('[runAiTurn] FINALLY');
       clearTimeout(abortTimer);
       setTimeout(() => setIsTyping(false), 400);
+      // Чистим pendingReply: либо ответ полностью эмитнули, либо словили ошибку.
+      // В обоих случаях фоновое восстановление больше не нужно.
+      if (user?.id && currentGirl?.id) {
+        clearPendingReply(user.id, currentGirl.id);
+      }
     }
   }, [currentGirl, session, user, t, tr, saveMessage]);
 
