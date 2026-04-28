@@ -315,19 +315,40 @@ export default function Chat() {
         // Сортируем DESC + limit, потом разворачиваем в UI-порядок (старые сверху, новые снизу).
         // Фильтр visible_at <= now() — иллюзия живого ответа: сообщение Алины,
         // запланированное в будущее, не подтянется при reload и не "заспойлерит" ответ.
-        const { data, error } = await supabase
-          .from('messages')
-          .select('id, role, content, created_at, visible_at')
-          .eq('user_id', userId)
-          .eq('girl_id', girlId)
-          .lte('visible_at', new Date().toISOString())
-          .order('created_at', { ascending: false })
-          .order('id', { ascending: false })
-          .limit(200);
+        //
+        // GRACEFUL FALLBACK: если миграция visible_at ещё не применена в БД —
+        // PostgREST вернёт 42703 ("column does not exist"). В этом случае
+        // повторяем запрос без visible_at, чтобы чат продолжал работать.
+        let data: Array<{ id: string | number; role: string; content: string; created_at: string }> | null = null;
+        const baseQuery = () =>
+          supabase
+            .from('messages')
+            .eq('user_id', userId!)
+            .eq('girl_id', girlId!)
+            .order('created_at', { ascending: false })
+            .order('id', { ascending: false })
+            .limit(200);
 
-        if (error) {
-          console.error('[Chat] loadMessages error:', error);
-          return;
+        const withVisible = await baseQuery()
+          .select('id, role, content, created_at, visible_at')
+          .lte('visible_at', new Date().toISOString());
+
+        if (withVisible.error) {
+          // 42703 = undefined_column. Любая другая ошибка — реальная проблема, репортим.
+          if (withVisible.error.code === '42703') {
+            console.warn('[Chat] visible_at column missing — falling back to plain select. Apply the migration.');
+            const fallback = await baseQuery().select('id, role, content, created_at');
+            if (fallback.error) {
+              console.error('[Chat] loadMessages error:', fallback.error);
+              return;
+            }
+            data = fallback.data;
+          } else {
+            console.error('[Chat] loadMessages error:', withVisible.error);
+            return;
+          }
+        } else {
+          data = withVisible.data;
         }
 
         const ordered = (data ?? []).slice().reverse();
@@ -491,7 +512,17 @@ export default function Chat() {
         if (visibleAt) row.visible_at = visibleAt.toISOString();
         const { error } = await supabase.from('messages').insert(row);
         if (error) {
-          console.error('[Chat] saveMessage error:', error);
+          // GRACEFUL FALLBACK: миграция visible_at не применена → повторяем без поля.
+          // Сообщение всё равно сохранится (visibleAt будет проигнорирован), а UX-illusion
+          // деградирует до in-memory only — это лучше, чем потеря сообщения.
+          if (error.code === '42703' && row.visible_at) {
+            console.warn('[Chat] visible_at column missing — saving without it. Apply the migration.');
+            delete row.visible_at;
+            const retry = await supabase.from('messages').insert(row);
+            if (retry.error) console.error('[Chat] saveMessage error:', retry.error);
+          } else {
+            console.error('[Chat] saveMessage error:', error);
+          }
         }
       } catch (e) {
         console.error('[Chat] saveMessage exception:', e);
