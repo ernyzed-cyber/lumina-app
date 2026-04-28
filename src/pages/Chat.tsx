@@ -320,24 +320,29 @@ export default function Chat() {
         // PostgREST вернёт 42703 ("column does not exist"). В этом случае
         // повторяем запрос без visible_at, чтобы чат продолжал работать.
         let data: Array<{ id: string | number; role: string; content: string; created_at: string }> | null = null;
-        const baseQuery = () =>
-          supabase
-            .from('messages')
-            .eq('user_id', userId!)
-            .eq('girl_id', girlId!)
-            .order('created_at', { ascending: false })
-            .order('id', { ascending: false })
-            .limit(200);
 
-        const withVisible = await baseQuery()
+        const withVisible = await supabase
+          .from('messages')
           .select('id, role, content, created_at, visible_at')
-          .lte('visible_at', new Date().toISOString());
+          .eq('user_id', userId)
+          .eq('girl_id', girlId)
+          .lte('visible_at', new Date().toISOString())
+          .order('created_at', { ascending: false })
+          .order('id', { ascending: false })
+          .limit(200);
 
         if (withVisible.error) {
           // 42703 = undefined_column. Любая другая ошибка — реальная проблема, репортим.
           if (withVisible.error.code === '42703') {
             console.warn('[Chat] visible_at column missing — falling back to plain select. Apply the migration.');
-            const fallback = await baseQuery().select('id, role, content, created_at');
+            const fallback = await supabase
+              .from('messages')
+              .select('id, role, content, created_at')
+              .eq('user_id', userId)
+              .eq('girl_id', girlId)
+              .order('created_at', { ascending: false })
+              .order('id', { ascending: false })
+              .limit(200);
             if (fallback.error) {
               console.error('[Chat] loadMessages error:', fallback.error);
               return;
