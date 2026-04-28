@@ -133,9 +133,10 @@ interface PendingReply {
   typingAt: number;
   /** visible_at каждого сегмента ответа — когда сегмент появляется в чате. */
   segmentVisibleAt: number[];
+  /** До какого момента держать "в сети" после последнего сегмента (обычно +5 min). */
+  liveOnlineUntil: number;
 }
 const PENDING_REPLY_PREFIX = 'pendingReply:';
-const PENDING_REPLY_TTL_MS = 5 * 60_000; // 5 min после lastSegmentAt считается мёртвой записью
 
 function pendingReplyKey(userId: string, girlId: string): string {
   return `${PENDING_REPLY_PREFIX}${userId}:${girlId}`;
@@ -160,9 +161,13 @@ function loadPendingReply(userId: string, girlId: string): PendingReply | null {
     ) {
       return null;
     }
-    const lastSegmentAt = parsed.segmentVisibleAt[parsed.segmentVisibleAt.length - 1] ?? parsed.typingAt;
-    if (Date.now() > lastSegmentAt + PENDING_REPLY_TTL_MS) {
-      // запись устарела — чистим
+    // liveOnlineUntil может отсутствовать в старых записях — backfill.
+    if (typeof parsed.liveOnlineUntil !== 'number') {
+      const lastSeg = parsed.segmentVisibleAt[parsed.segmentVisibleAt.length - 1] ?? parsed.typingAt;
+      parsed.liveOnlineUntil = lastSeg + 300_000;
+    }
+    // Считаем запись мёртвой если "в сети" окно полностью истекло + 1 мин запаса.
+    if (Date.now() > parsed.liveOnlineUntil + 60_000) {
       localStorage.removeItem(pendingReplyKey(userId, girlId));
       return null;
     }
@@ -376,12 +381,16 @@ export default function Chat() {
    * cancelledRef — внешний "флаг отмены"; передаётся из effect'а, который
    * управляет жизненным циклом загрузки. Если ref.current=true — результат
    * игнорируется (защита от race при перемонтировании / смене girlId).
+   *
+   * silent — если true, не трогаем loadingMessages (нет спиннера). Используется
+   * для фонового рефреша в pendingReply-таймерах: пользователь не должен видеть
+   * "Загрузка..." когда просто подтягивается отложенный сегмент Алины.
    */
   const loadMessages = useCallback(
-    async (cancelledRef?: { current: boolean }) => {
+    async (cancelledRef?: { current: boolean }, silent: boolean = false) => {
       if (!userId || !girlId) return;
-      setLoadingMessages(true);
-      console.log('[Chat] loadMessages START', { userId, girlId });
+      if (!silent) setLoadingMessages(true);
+      console.log('[Chat] loadMessages START', { userId, girlId, silent });
       try {
         let data: Array<{ id: string | number; role: string; content: string; created_at: string }> | null = null;
 
@@ -441,7 +450,7 @@ export default function Chat() {
       } catch (e) {
         console.error('[Chat] loadMessages exception:', e);
       } finally {
-        if (!cancelledRef?.current) setLoadingMessages(false);
+        if (!cancelledRef?.current && !silent) setLoadingMessages(false);
       }
     },
     [userId, girlId],
@@ -456,14 +465,14 @@ export default function Chat() {
   }, [userId, girlId, loadMessages]);
 
   /* ── Restore pending reply after reload ──
-     Если до перезагрузки AI был "в процессе" (есть запись в localStorage с
-     запланированными visibleAt в будущем) — восстанавливаем UX:
+     Если до перезагрузки AI был "в процессе" или только что закончил отвечать
+     (есть запись в localStorage с liveOnlineUntil в будущем) — восстанавливаем UX:
        • статус "в сети"/"печатает" по текущей фазе;
-       • блокируем ввод (awaitingReply);
+       • блокируем ввод (awaitingReply) пока сегменты не доставлены;
        • запускаем оставшиеся таймеры до visible_at каждого сегмента,
-         после чего перечитываем сообщения из БД (сегмент уже там).
-     Эффект работает только после загрузки текущего girl — иначе мы
-     не знаем чьи pending восстанавливать. */
+         после чего silent-перечитываем сообщения из БД (сегмент уже там).
+       • держим "в сети" до liveOnlineUntil (5 мин после последнего сегмента).
+     Эффект работает только после загрузки текущего girl. */
   useEffect(() => {
     if (!userId || !girlId) return;
     const pending = loadPendingReply(userId, girlId);
@@ -473,9 +482,8 @@ export default function Chat() {
     const lastSegmentAt =
       pending.segmentVisibleAt[pending.segmentVisibleAt.length - 1] ?? pending.typingAt;
 
-    // Если все сегменты уже должны быть видны — просто чистим запись.
-    // loadMessages уже отработал и подтянул их (visible_at <= now).
-    if (now >= lastSegmentAt) {
+    // Если liveOnlineUntil уже истёк — мёртвая запись, чистим.
+    if (now >= pending.liveOnlineUntil) {
       clearPendingReply(userId, girlId);
       return;
     }
@@ -485,9 +493,21 @@ export default function Chat() {
       onlineAt: pending.onlineAt,
       typingAt: pending.typingAt,
       lastSegmentAt,
+      liveOnlineUntil: pending.liveOnlineUntil,
     });
 
-    // Блокируем ввод — AI ещё "думает".
+    // Если все сегменты уже доставлены, но мы ещё в окне "в сети" —
+    // просто включаем online-статус и ставим таймер на его выключение.
+    if (now >= lastSegmentAt) {
+      setLiveOnline(true);
+      const offTimer = setTimeout(() => {
+        setLiveOnline(false);
+        clearPendingReply(userId, girlId);
+      }, pending.liveOnlineUntil - now);
+      return () => clearTimeout(offTimer);
+    }
+
+    // AI ещё "думает" / печатает — блокируем ввод.
     awaitingReplyRef.current = true;
     setAwaitingReply(true);
 
@@ -509,14 +529,16 @@ export default function Chat() {
       scheduleAt(pending.typingAt, () => setIsTyping(true));
     }
 
-    // Каждый будущий сегмент: при наступлении visible_at перечитываем БД.
+    // Каждый будущий сегмент: при наступлении visible_at silent-перечитываем БД.
     // typing-индикатор гасим за 250 мс до сегмента (как в runAiTurn).
     for (let i = 0; i < pending.segmentVisibleAt.length; i++) {
       const segAt = pending.segmentVisibleAt[i];
       if (segAt <= now) continue;
       scheduleAt(segAt - 250, () => setIsTyping(false));
       scheduleAt(segAt, () => {
-        loadMessages();
+        // silent: без спиннера "Загрузка..." — это фоновое подтягивание
+        // отложенного сегмента, юзер не должен видеть индикатор загрузки.
+        loadMessages(undefined, true);
         // между сегментами снова показываем typing
         if (i < pending.segmentVisibleAt.length - 1) {
           setIsTyping(true);
@@ -524,14 +546,18 @@ export default function Chat() {
       });
     }
 
-    // После последнего сегмента: снимаем awaitingReply и чистим.
+    // После последнего сегмента: снимаем awaitingReply, гасим typing.
+    // НЕ чистим pendingReply — он ещё нужен для liveOnlineUntil окна.
     scheduleAt(lastSegmentAt + 300, () => {
       setIsTyping(false);
       awaitingReplyRef.current = false;
       setAwaitingReply(false);
+    });
+
+    // Окно "в сети" — гасим в liveOnlineUntil и чистим запись.
+    scheduleAt(pending.liveOnlineUntil, () => {
+      setLiveOnline(false);
       clearPendingReply(userId, girlId);
-      // online ещё держим 5 минут как в обычном flow.
-      timers.push(setTimeout(() => setLiveOnline(false), 300_000));
     });
 
     return () => {
@@ -802,12 +828,17 @@ export default function Chat() {
 
       // Persist расписание в localStorage — чтобы reload/закрытие вкладки не
       // сломали illusion. Восстановление в effect'е ниже.
+      // liveOnlineUntil — последняя точка когда статус "в сети" гаснет
+      // (через 5 мин после последнего сегмента, как и в обычном flow).
+      const lastSegmentMs = segmentVisibleAt[segmentVisibleAt.length - 1]?.getTime()
+        ?? sendStart + baseDelayMs;
       if (user?.id && currentGirl?.id) {
         savePendingReply(user.id, currentGirl.id, {
           startedAt: sendStart,
           onlineAt: sendStart + schedule.ignoreMs,
           typingAt: sendStart + schedule.ignoreMs + schedule.onlineMs,
           segmentVisibleAt: segmentVisibleAt.map((d) => d.getTime()),
+          liveOnlineUntil: lastSegmentMs + 300_000,
         });
       }
 
@@ -876,15 +907,17 @@ export default function Chat() {
       setMessages((prev) => [...prev, aiMsg]);
       saveMessage('assistant', fallback);
       setTimeout(() => setLiveOnline(false), 300_000);
+      // Fallback — pendingReply теряет смысл (расписание не соответствует реальности).
+      if (user?.id && currentGirl?.id) {
+        clearPendingReply(user.id, currentGirl.id);
+      }
     } finally {
       console.log('[runAiTurn] FINALLY');
       clearTimeout(abortTimer);
       setTimeout(() => setIsTyping(false), 400);
-      // Чистим pendingReply: либо ответ полностью эмитнули, либо словили ошибку.
-      // В обоих случаях фоновое восстановление больше не нужно.
-      if (user?.id && currentGirl?.id) {
-        clearPendingReply(user.id, currentGirl.id);
-      }
+      // ВАЖНО: pendingReply здесь НЕ чистим. Он содержит liveOnlineUntil
+      // (5 мин окно "в сети" после ответа) — нужен чтобы reload в этом
+      // окне корректно показал статус "в сети". Запись сама истечёт по TTL.
     }
   }, [currentGirl, session, user, t, tr, saveMessage]);
 
