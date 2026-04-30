@@ -29,7 +29,7 @@ const CORS_HEADERS: Record<string, string> = {
 };
 
 const GROK_URL = 'https://api.x.ai/v1/chat/completions';
-const GROK_MODEL = 'grok-4-1-fast-reasoning';
+const GROK_MODEL = 'grok-4-1-fast-non-reasoning';
 
 // ── Cooldowns / thresholds ────────────────────────────────────────────────
 const ROLL_INTERVAL_HOURS = 1;          // как часто пара пересматривается (cron всё равно идёт раз в 15 мин)

@@ -33,7 +33,7 @@ const CORS_HEADERS: Record<string, string> = {
 };
 
 const GROK_URL = 'https://api.x.ai/v1/chat/completions';
-const GROK_MODEL = 'grok-4-1-fast-reasoning';
+const GROK_MODEL = 'grok-4-1-fast-non-reasoning';
 
 const MEMORY_LIMIT = 3;
 const SUMMARY_TRIGGER = 6;
@@ -124,14 +124,21 @@ function json(status: number, data: unknown): Response {
 async function callGrok(
   apiKey: string,
   messages: ChatMessage[],
-  opts: { temperature?: number; max_tokens?: number } = {},
+  opts: { temperature?: number; max_tokens?: number; convId?: string } = {},
 ): Promise<string> {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${apiKey}`,
+    'Content-Type': 'application/json',
+  };
+  // Hint to xAI to keep prompt-prefix cache warm for this conversation.
+  // Cache works on EXACT prefix match, so the system prompt MUST be assembled
+  // with stable blocks first (persona, platform, profile, memory) and volatile
+  // blocks last (time, anti-repeat, daily flavor, scene injections).
+  if (opts.convId) headers['x-grok-conv-id'] = opts.convId;
+
   const res = await fetch(GROK_URL, {
     method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
+    headers,
     body: JSON.stringify({
       model: GROK_MODEL,
       messages,
@@ -369,7 +376,13 @@ function buildAntiRepeatBlock(messages: ChatMessage[]): string {
 
   // Последняя реплика ассистента — не повторять её слова/структуру дословно
   const lastAssistant = [...messages].reverse().find((m) => m.role === 'assistant')?.content ?? '';
-  const lastSnippet = lastAssistant.length > 80 ? lastAssistant.slice(0, 80) + '…' : lastAssistant;
+  // Use spread to iterate by Unicode code points (not code units) so emoji
+  // at the boundary don't get split into lone surrogates, which would produce
+  // invalid JSON when serialised with JSON.stringify.
+  const lastAssistantChars = [...lastAssistant];
+  const lastSnippet = lastAssistantChars.length > 80
+    ? lastAssistantChars.slice(0, 80).join('') + '…'
+    : lastAssistant;
 
   const base = [
     '=== ANTI-REPETITION (ВАЖНО) ===',
@@ -599,8 +612,14 @@ Deno.serve(async (req: Request) => {
       if (personaPrompt) {
         // Дата для детерминистичного «события дня» — YYYY-MM-DD в её TZ.
         const localDate = localTime.iso.slice(0, 10);
+        // ВАЖНО: порядок блоков подобран для prompt-prefix кэширования xAI.
+        // Сначала идёт ВСЁ стабильное (persona, platform, profile, memory,
+        // messaging style) — этот префикс не меняется между вызовами одного
+        // юзера и кэшируется. После него — волатильные блоки (время,
+        // daily flavor, anti-repeat, intimacy/gift/scene injections),
+        // которые меняются и не должны разрывать кэш.
         systemPrompt = [
-          buildTimeBlock(city, timezone, localTime),
+          // ── STABLE PREFIX (cacheable) ─────────────────────────────────
           personaPrompt,
           '',
           '=== PLATFORM CONTEXT ===',
@@ -612,15 +631,22 @@ Deno.serve(async (req: Request) => {
           '=== MEMORY ===',
           buildMemoryBlock(memories),
           '',
+          '=== MESSAGING STYLE ===',
+          'You may split your reply into 1–3 short messages separated by a double newline (\\n\\n). Use multiple messages only when it feels natural: reaction then question, agreement then a second thought, a quick correction. Most replies are 1 message. Never force splitting.',
+          '',
+          `=== STATIC LOCATION FACTS ===`,
+          `• Your city: ${city}`,
+          `• Your timezone: ${timezone}`,
+          `Ты живёшь в городе «${city}». НЕ придумывай другой город. Никаких Лондонов, Парижей и т.п.`,
+          '',
+          // ── VOLATILE SUFFIX (changes per request — not cached) ────────
+          buildTimeBlock(city, timezone, localTime),
           buildDailyFlavorBlock(girlId, localDate),
           '',
           buildAntiRepeatBlock(messages),
           '',
-          '=== MESSAGING STYLE ===',
-          'You may split your reply into 1–3 short messages separated by a double newline (\\n\\n). Use multiple messages only when it feels natural: reaction then question, agreement then a second thought, a quick correction. Most replies are 1 message. Never force splitting.',
-          '',
           '━━━ FINAL REMINDER ━━━',
-          `Your city is ${city}. Your local time is ${localTime.human}. Use these exact values if asked.`,
+          `Your local time is ${localTime.human}. Use this exact value if asked.`,
         ].join('\n');
 
         // ── Intimacy / gift-memory / scene injections ──────────────────────
@@ -659,6 +685,7 @@ Deno.serve(async (req: Request) => {
     const reply = await callGrok(apiKey, finalMessages, {
       temperature: 0.9,
       max_tokens: 300,
+      convId: userId && girlId ? `${userId}:${girlId}` : undefined,
     });
 
     // Расписание показа ответа на клиенте (имитация живого собеседника).
