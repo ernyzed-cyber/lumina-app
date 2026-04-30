@@ -1,7 +1,8 @@
 // Supabase Edge Function: chat-ai
 // Grok API (xAI) — OpenAI-compatible format.
 // Грузит персонажа из girl_personas, профиль из profiles, воспоминания из memories.
-// Асинхронно сохраняет резюме диалога в memories каждые SUMMARY_TRIGGER сообщений.
+// На границе сессии (idle ≥ SESSION_IDLE_MS) асинхронно вызывает Grok-экстрактор
+// и пишет в user_facts / girl_self_facts / memories. См. closeSessionAsync.
 //
 // Secrets:
 //   GROK_API_KEY           -- ключ xAI (xai-...)
@@ -36,7 +37,6 @@ const GROK_URL = 'https://api.x.ai/v1/chat/completions';
 const GROK_MODEL = 'grok-4-1-fast-non-reasoning';
 
 const MEMORY_LIMIT = 3;
-const SUMMARY_TRIGGER = 6;
 const HISTORY_LIMIT = 30; // last N visible messages loaded from DB on the server
 
 // ---------------------------------------------------------------------------
@@ -422,42 +422,191 @@ function buildMemoryBlock(
   );
 }
 
-async function saveMemoryAsync(
+// ---------------------------------------------------------------------------
+// Session close + fact extraction (Step 3 of memory plan).
+//
+// Trigger: при следующем сообщении юзера, если gap = now - last_user_message_at
+// >= SESSION_IDLE_MS И session_started_at не null И в окне [start, now) было
+// >= MIN_SESSION_MESSAGES сообщений → вызываем closeSessionAsync через
+// EdgeRuntime.waitUntil. Юзер не ждёт.
+//
+// Один Grok-вызов с JSON-выходом возвращает {summary, user_facts, girl_self_facts}.
+// user_facts UPSERT с UNIQUE(user_id, girl_id, key, value) — противоречия
+// сосуществуют. girl_self_facts INSERT ON CONFLICT (user_id, girl_id, key) DO
+// NOTHING — первая версия каждого факта о себе фиксируется и не переписывается.
+// memories.summary — одна запись на сессию.
+// ---------------------------------------------------------------------------
+
+const SESSION_IDLE_MS = 30 * 60_000;
+const MIN_SESSION_MESSAGES = 2;
+
+interface ExtractedFact {
+  key: string;
+  value: string;
+}
+
+interface SessionExtraction {
+  summary: string;
+  user_facts: ExtractedFact[];
+  girl_self_facts: ExtractedFact[];
+}
+
+function sanitizeFacts(raw: unknown): ExtractedFact[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ExtractedFact[] = [];
+  for (const item of raw) {
+    if (!item || typeof item !== 'object') continue;
+    const key = (item as { key?: unknown }).key;
+    const value = (item as { value?: unknown }).value;
+    if (typeof key !== 'string' || typeof value !== 'string') continue;
+    const k = key.trim().slice(0, 64);
+    const v = value.trim().slice(0, 280);
+    if (!k || !v) continue;
+    out.push({ key: k, value: v });
+  }
+  return out;
+}
+
+async function closeSessionAsync(
   supabase: ReturnType<typeof createClient>,
   apiKey: string,
-  girlId: string,
   userId: string,
-  dialog: ChatMessage[],
+  girlId: string,
+  sessionStart: string,
+  now: string,
+  lang: 'ru' | 'en',
 ): Promise<void> {
   try {
-    if (dialog.length < SUMMARY_TRIGGER) return;
-    const transcript = dialog
+    const { data: rows, error } = await supabase
+      .from('messages')
+      .select('role, content, created_at')
+      .eq('user_id', userId)
+      .eq('girl_id', girlId)
+      .gte('created_at', sessionStart)
+      .lt('created_at', now)
+      .order('created_at', { ascending: true });
+    if (error) {
+      console.error('[chat-ai] closeSession select failed:', error.message);
+      return;
+    }
+    const sessionMsgs = (rows ?? []) as Array<{ role: string; content: string }>;
+    if (sessionMsgs.length < MIN_SESSION_MESSAGES) {
+      console.log('[chat-ai] closeSession skip (too few messages)', {
+        count: sessionMsgs.length,
+      });
+      return;
+    }
+
+    const transcript = sessionMsgs
       .map((m) => `${m.role === 'user' ? 'HE' : 'I'}: ${m.content}`)
       .join('\n');
-    const summaryMessages: ChatMessage[] = [
-      {
-        role: 'system',
-        content:
-          'You read a chat transcript and write a brief diary entry in Russian (2-3 sentences, first person, like "говорили о..."). Capture only important facts about the interlocutor and emotional tone. No fluff. No emoji.',
-      },
-      {
-        role: 'user',
-        content: `Transcript:\n${transcript}\n\nWrite a 2-3 sentence diary entry in Russian.`,
-      },
-    ];
-    const summary = await callGrok(apiKey, summaryMessages, {
-      temperature: 0.4,
-      max_tokens: 150,
+
+    const summaryLangHint = lang === 'en'
+      ? 'Write summary in English.'
+      : 'Пиши summary на русском.';
+
+    const extractorSystem = [
+      'You read a chat transcript between a girl ("I") and a man ("HE") and extract structured memory.',
+      'Output STRICT JSON with this shape:',
+      '{',
+      '  "summary": string,                        // 2-3 sentences, first person from girl ("я"), what happened, emotional tone. No fluff. No emoji.',
+      '  "user_facts": [{"key": string, "value": string}],       // facts about HIM you learned. key is a short slug like "name", "city", "job", "hobby", "pet", "favorite_food", "mood_today". value is concrete. Skip if nothing concrete.',
+      '  "girl_self_facts": [{"key": string, "value": string}]   // concrete things YOU told him about yourself in this session that you must stay consistent with later (sister name, favorite movie, where you studied, pet name). NOT personality traits, NOT vague feelings. Skip if nothing concrete.',
+      '}',
+      'Rules:',
+      '- key: snake_case, ASCII, max 40 chars',
+      '- value: short concrete fact, max 200 chars',
+      '- Do NOT invent facts not present in transcript.',
+      '- If a category is empty, return [].',
+      summaryLangHint,
+      'Return ONLY the JSON object. No prose, no code fences.',
+    ].join('\n');
+
+    const extractorUser = `Transcript:\n${transcript}\n\nReturn JSON.`;
+
+    const raw = await callGrok(apiKey, [
+      { role: 'system', content: extractorSystem },
+      { role: 'user', content: extractorUser },
+    ], {
+      temperature: 0.2,
+      max_tokens: 600,
+      convId: `${userId}:${girlId}:extract`,
     });
-    if (!summary) return;
-    await supabase.from('memories').insert({
-      girl_id: girlId,
-      user_id: userId,
-      summary,
-      key_facts: {},
+
+    if (!raw) {
+      console.error('[chat-ai] closeSession: empty extractor reply');
+      return;
+    }
+
+    let parsed: SessionExtraction | null = null;
+    try {
+      // Defensive: strip potential ```json fences if model added them.
+      const cleaned = raw.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+      parsed = JSON.parse(cleaned) as SessionExtraction;
+    } catch (e) {
+      console.error('[chat-ai] closeSession: JSON parse failed', {
+        err: e instanceof Error ? e.message : String(e),
+        raw: raw.slice(0, 500),
+      });
+      return;
+    }
+
+    const summary = typeof parsed.summary === 'string' ? parsed.summary.trim() : '';
+    const userFacts = sanitizeFacts(parsed.user_facts);
+    const selfFacts = sanitizeFacts(parsed.girl_self_facts);
+
+    console.log('[chat-ai] closeSession extracted', {
+      messages: sessionMsgs.length,
+      summaryLen: summary.length,
+      userFacts: userFacts.length,
+      selfFacts: selfFacts.length,
     });
+
+    // 1) memories — журнальная запись.
+    if (summary) {
+      const { error: memErr } = await supabase.from('memories').insert({
+        user_id: userId,
+        girl_id: girlId,
+        summary,
+        key_facts: {},
+      });
+      if (memErr) console.error('[chat-ai] closeSession memories insert:', memErr.message);
+    }
+
+    // 2) user_facts — UNIQUE(user_id, girl_id, key, value) допускает противоречия.
+    if (userFacts.length > 0) {
+      const rows = userFacts.map((f) => ({
+        user_id: userId,
+        girl_id: girlId,
+        key: f.key,
+        value: f.value,
+      }));
+      const { error: ufErr } = await supabase
+        .from('user_facts')
+        .upsert(rows, { onConflict: 'user_id,girl_id,key,value', ignoreDuplicates: true });
+      if (ufErr) console.error('[chat-ai] closeSession user_facts upsert:', ufErr.message);
+    }
+
+    // 3) girl_self_facts — UNIQUE(user_id, girl_id, key), первая версия побеждает.
+    if (selfFacts.length > 0) {
+      const rows = selfFacts.map((f) => ({
+        user_id: userId,
+        girl_id: girlId,
+        key: f.key,
+        value: f.value,
+      }));
+      const { error: sfErr } = await supabase
+        .from('girl_self_facts')
+        .upsert(rows, { onConflict: 'user_id,girl_id,key', ignoreDuplicates: true });
+      if (sfErr) console.error('[chat-ai] closeSession girl_self_facts upsert:', sfErr.message);
+    }
+
+    // 4) last_journal_at — диагностический маркер.
+    await supabase.from('user_girl_state').update({
+      last_journal_at: new Date().toISOString(),
+    }).eq('user_id', userId).eq('girl_id', girlId);
   } catch (err) {
-    console.error('[chat-ai] saveMemoryAsync failed:', err);
+    console.error('[chat-ai] closeSessionAsync failed:', err instanceof Error ? err.message : err);
   }
 }
 
@@ -545,7 +694,7 @@ Deno.serve(async (req: Request) => {
       // ─────────────────────────────────────────────────────────────────────
 
       const nowIsoForHistory = new Date().toISOString();
-      const [personaRes, profileRes, memoriesRes, giftMemRes, relRes, historyRes] = await Promise.all([
+      const [personaRes, profileRes, memoriesRes, giftMemRes, relRes, historyRes, stateRes] = await Promise.all([
         supabase
           .from('girl_personas')
           .select('system_prompt, name, timezone, city')
@@ -587,7 +736,65 @@ Deno.serve(async (req: Request) => {
           .lte('visible_at', nowIsoForHistory)
           .order('created_at', { ascending: false })
           .limit(HISTORY_LIMIT),
+        // Состояние сессии: нужно для определения границы (idle ≥ 30 мин)
+        // и решения, не пора ли закрывать прошлую сессию через
+        // closeSessionAsync. Если строки нет — это первая встреча,
+        // session_started_at проставится ниже.
+        supabase
+          .from('user_girl_state')
+          .select('last_user_message_at, session_started_at')
+          .eq('user_id', userId)
+          .eq('girl_id', girlId)
+          .maybeSingle(),
       ]);
+
+      // ── Session boundary detection ───────────────────────────────────────
+      // Логика:
+      //   gap = now - last_user_message_at
+      //   if gap >= SESSION_IDLE_MS && session_started_at != null:
+      //       → закрываем прошлую сессию (waitUntil), стартуем новую
+      //   if session_started_at == null (первая встреча или после закрытия):
+      //       → просто стартуем новую сессию
+      //   else: продолжается текущая сессия — ничего не трогаем кроме
+      //         last_user_message_at (это сделают upsert'ы ниже).
+      const nowMs = Date.now();
+      const lastUserAtRaw = stateRes.data?.last_user_message_at as string | null | undefined;
+      const sessionStartedAtRaw = stateRes.data?.session_started_at as string | null | undefined;
+      const lastUserAtMs = lastUserAtRaw ? Date.parse(lastUserAtRaw) : NaN;
+      const sessionStartedAt = sessionStartedAtRaw ?? null;
+      const gapMs = Number.isFinite(lastUserAtMs) ? nowMs - lastUserAtMs : Number.POSITIVE_INFINITY;
+      const shouldCloseSession = sessionStartedAt !== null && gapMs >= SESSION_IDLE_MS;
+      // Новая сессия начинается, если: (а) её ещё нет, или (б) только что закрыли.
+      const startNewSession = sessionStartedAt === null || shouldCloseSession;
+      const newSessionStartedAt = startNewSession ? new Date(nowMs).toISOString() : sessionStartedAt;
+
+      console.log('[chat-ai] session', {
+        gapMin: Number.isFinite(gapMs) ? Math.round(gapMs / 60_000) : 'inf',
+        sessionStartedAt,
+        shouldCloseSession,
+        startNewSession,
+      });
+
+      if (shouldCloseSession && sessionStartedAt) {
+        const closeNowIso = new Date(nowMs).toISOString();
+        const task = closeSessionAsync(
+          supabase,
+          apiKey,
+          userId,
+          girlId,
+          sessionStartedAt,
+          closeNowIso,
+          lang,
+        );
+        // @ts-ignore EdgeRuntime is provided by Deno Deploy at runtime.
+        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(task);
+        } else {
+          task.catch((e) => console.error('[chat-ai] closeSession error:', e));
+        }
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       const personaPrompt = personaRes.data?.system_prompt;
       const timezone = (personaRes.data?.timezone as string) || 'Europe/Moscow';
@@ -650,6 +857,7 @@ Deno.serve(async (req: Request) => {
           user_id: userId,
           girl_id: girlId,
           last_user_message_at: nowIso,
+          session_started_at: newSessionStartedAt,
           status: 'offline',
           status_until: null,
           updated_at: nowIso,
@@ -769,26 +977,15 @@ Deno.serve(async (req: Request) => {
         user_id: userId,
         girl_id: girlId,
         last_user_message_at: nowIso,
+        session_started_at: newSessionStartedAt,
         status: 'offline',
         status_until: untilIso,
         updated_at: nowIso,
       }, { onConflict: 'user_id,girl_id' });
 
-      const fullDialog: ChatMessage[] = [
-        ...effectiveHistory,
-        { role: 'assistant', content: reply },
-      ];
-      // @ts-ignore
-      if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
-        // @ts-ignore
-        EdgeRuntime.waitUntil(
-          saveMemoryAsync(supabase, apiKey, girlId, userId, fullDialog),
-        );
-      } else {
-        saveMemoryAsync(supabase, apiKey, girlId, userId, fullDialog).catch(
-          (e) => console.error('[chat-ai] memory save error:', e),
-        );
-      }
+      // Сохранение фактов и журнала теперь происходит на границе сессии
+      // (см. closeSessionAsync, вызывается в начале обработки запроса при
+      // idle ≥ SESSION_IDLE_MS). Здесь — ничего; ответ уже отправлен.
     }
 
     return json(200, { reply, model: GROK_MODEL, schedule, mode: dayMode });

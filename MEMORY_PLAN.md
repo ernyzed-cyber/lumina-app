@@ -151,6 +151,12 @@ girl_self_facts(
 - Forgetting / TTL фактов (через 6 мес confidence < 0.3 → drop).
 - UI для пользователя "что персона помнит обо мне".
 
+## Follow-up after Step 5: GitHub Action — auto-deploy edge functions
+- Trigger: push to main when files in `supabase/functions/**` changed.
+- Diff-based: parse changed paths, deploy only affected function names (chat-ai, proactive-tick, etc.).
+- Required GitHub Secrets: `SUPABASE_ACCESS_TOKEN` (from Account → Tokens), `SUPABASE_PROJECT_REF`.
+- File: `.github/workflows/deploy-functions.yml`.
+
 ## Risks / known gotchas
 - **Грузим 30 сообщений сервером** → меняется длина контекста Grok → могут вырасти токены. Мониторить.
 - **Inline закрытие сессии** добавляет один Grok-вызов в момент "первое сообщение после паузы". Это ~+1.5 сек. Можно сделать через `EdgeRuntime.waitUntil` чтобы не блокировать ответ. ✅ обязательно так.
