@@ -37,6 +37,7 @@ const GROK_MODEL = 'grok-4-1-fast-non-reasoning';
 
 const MEMORY_LIMIT = 3;
 const SUMMARY_TRIGGER = 6;
+const HISTORY_LIMIT = 30; // last N visible messages loaded from DB on the server
 
 // ---------------------------------------------------------------------------
 // Response timing (имитация живого человека)
@@ -493,6 +494,9 @@ Deno.serve(async (req: Request) => {
 
     let systemPrompt = '';
     let dayMode: DayMode = 'rest';
+    // Effective conversation history fed to Grok. Defaults to client-sent
+    // `messages`; replaced by server-merged history when girlId+userId present.
+    let effectiveHistory: ChatMessage[] = messages;
 
     if (girlId && userId) {
       const lang: 'ru' | 'en' = body.lang === 'en' ? 'en' : 'ru';
@@ -540,7 +544,8 @@ Deno.serve(async (req: Request) => {
       await supabase.rpc('increment_messages_used', { p_user_id: userId });
       // ─────────────────────────────────────────────────────────────────────
 
-      const [personaRes, profileRes, memoriesRes, giftMemRes, relRes] = await Promise.all([
+      const nowIsoForHistory = new Date().toISOString();
+      const [personaRes, profileRes, memoriesRes, giftMemRes, relRes, historyRes] = await Promise.all([
         supabase
           .from('girl_personas')
           .select('system_prompt, name, timezone, city')
@@ -569,6 +574,19 @@ Deno.serve(async (req: Request) => {
           .eq('user_id', userId)
           .eq('girl_id', girlId)
           .maybeSingle(),
+        // Server-authoritative chat history: last HISTORY_LIMIT messages that
+        // are already visible (visible_at <= now). The client also sends
+        // `messages` in the body — we merge below, deduping by (role, content).
+        // This guarantees the model always sees real history even after
+        // reload, when the client may have a partial state.
+        supabase
+          .from('messages')
+          .select('role, content, created_at, visible_at')
+          .eq('user_id', userId)
+          .eq('girl_id', girlId)
+          .lte('visible_at', nowIsoForHistory)
+          .order('created_at', { ascending: false })
+          .limit(HISTORY_LIMIT),
       ]);
 
       const personaPrompt = personaRes.data?.system_prompt;
@@ -576,6 +594,37 @@ Deno.serve(async (req: Request) => {
       const city = (personaRes.data?.city as string) || 'Москва';
       const profile = profileRes.data ?? null;
       const memories = memoriesRes.data ?? [];
+
+      // Merge server history (authoritative) with client-sent messages.
+      // Client may include the latest user message that's not yet persisted,
+      // or messages whose visible_at is still in the future (deferred sleep).
+      // Strategy: take server history (oldest→newest), then append any client
+      // message whose (role, content) isn't already present.
+      const serverHistory: ChatMessage[] = (historyRes.data ?? [])
+        .slice()
+        .reverse()
+        .map((row) => ({
+          role: (row.role as 'user' | 'assistant'),
+          content: row.content as string,
+        }));
+      const seenKeys = new Set(
+        serverHistory.map((m) => `${m.role}::${m.content}`),
+      );
+      const mergedHistory: ChatMessage[] = [...serverHistory];
+      for (const m of messages) {
+        if (m.role === 'system') continue;
+        const k = `${m.role}::${m.content}`;
+        if (!seenKeys.has(k)) {
+          mergedHistory.push(m);
+          seenKeys.add(k);
+        }
+      }
+      console.log('[chat-ai] history merge', {
+        server: serverHistory.length,
+        client: messages.length,
+        merged: mergedHistory.length,
+      });
+      effectiveHistory = mergedHistory;
 
       const localTime = computeLocalTime(timezone);
       dayMode = localTime.mode;
@@ -643,7 +692,7 @@ Deno.serve(async (req: Request) => {
           buildTimeBlock(city, timezone, localTime),
           buildDailyFlavorBlock(girlId, localDate),
           '',
-          buildAntiRepeatBlock(messages),
+          buildAntiRepeatBlock(effectiveHistory),
           '',
           '━━━ FINAL REMINDER ━━━',
           `Your local time is ${localTime.human}. Use this exact value if asked.`,
@@ -680,7 +729,7 @@ Deno.serve(async (req: Request) => {
     if (systemPrompt) {
       finalMessages.push({ role: 'system', content: systemPrompt });
     }
-    finalMessages.push(...messages);
+    finalMessages.push(...effectiveHistory);
 
     const reply = await callGrok(apiKey, finalMessages, {
       temperature: 0.9,
@@ -689,7 +738,7 @@ Deno.serve(async (req: Request) => {
     });
 
     // Расписание показа ответа на клиенте (имитация живого собеседника).
-    const lastUserText = [...messages].reverse().find((m) => m.role === 'user')?.content ?? '';
+    const lastUserText = [...effectiveHistory].reverse().find((m) => m.role === 'user')?.content ?? '';
 
     // Если она спит — считаем сколько мс до 07:00 её timezone.
     let msUntilWake = 0;
@@ -726,7 +775,7 @@ Deno.serve(async (req: Request) => {
       }, { onConflict: 'user_id,girl_id' });
 
       const fullDialog: ChatMessage[] = [
-        ...messages,
+        ...effectiveHistory,
         { role: 'assistant', content: reply },
       ];
       // @ts-ignore
