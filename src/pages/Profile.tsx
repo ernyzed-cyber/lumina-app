@@ -32,7 +32,46 @@ import Navbar from '../components/layout/Navbar';
 import PageTransition from '../components/layout/PageTransition';
 import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
-import { supabase } from '../lib/supabase';
+import { supabase, EDGE_FUNCTION_URL } from '../lib/supabase';
+
+/**
+ * Fire-and-forget request to the describe-avatar edge function.
+ * Triggered whenever avatar_url changes (first upload or after deletion of
+ * the previous main photo). The function downloads the public avatar URL,
+ * asks the vision model for a short description, and saves it to
+ * profiles.avatar_description so chat-ai can reference what the user
+ * actually looks like instead of inventing details.
+ *
+ * Errors are intentionally swallowed: avatar description is non-critical;
+ * the user shouldn't see a toast if it fails. The function is also
+ * idempotent server-side (skips if avatar_described_url already matches).
+ */
+async function triggerDescribeAvatar(): Promise<void> {
+  if (!EDGE_FUNCTION_URL) return;
+  // chat-ai/EDGE_FUNCTION_URL points at the chat-ai endpoint; derive the
+  // describe-avatar sibling endpoint from it.
+  const base = EDGE_FUNCTION_URL.replace(/\/chat-ai\/?$/, '');
+  const url = `${base}/describe-avatar`;
+  try {
+    const { data: sess } = await supabase.auth.getSession();
+    const token = sess?.session?.access_token;
+    if (!token) return;
+    await fetch(url, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({}),
+    });
+  } catch (err) {
+    // Non-critical: the next time the user changes their avatar (or the next
+    // login), the function will try again. We log only in dev.
+    if (import.meta.env.DEV) {
+      console.warn('[Profile] describe-avatar trigger failed:', err);
+    }
+  }
+}
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { useLanguage } from '../i18n';
@@ -595,7 +634,11 @@ export default function Profile() {
 
         setProfileData((prev) => ({ ...prev, photos: newPhotos }));
         setMyPhotos(newPhotos);
-        if (isFirst) setMyAvatar(publicUrl);
+        if (isFirst) {
+          setMyAvatar(publicUrl);
+          // New avatar set → ask the vision model to describe it (async, non-blocking).
+          void triggerDescribeAvatar();
+        }
         showToast(t('profile.photoUploaded'), 'success');
       } catch (err) {
         console.error('[Profile] photo upload error:', err);
@@ -624,6 +667,7 @@ export default function Profile() {
 
         const newPhotos = profileData.photos.filter((p) => p !== photoUrl);
         const newAvatar = newPhotos[0] ?? null;
+        const avatarChanged = newAvatar !== (myAvatar ?? null);
 
         await supabase.from('profiles').upsert({
           id: user.id,
@@ -635,13 +679,17 @@ export default function Profile() {
         setProfileData((prev) => ({ ...prev, photos: newPhotos }));
         setMyPhotos(newPhotos);
         setMyAvatar(newAvatar);
+        if (avatarChanged) {
+          // Avatar replaced or removed → re-describe (or clear) on the server.
+          void triggerDescribeAvatar();
+        }
         showToast(t('profile.photoDeleted'), 'info');
       } catch (err) {
         console.error('[Profile] photo delete error:', err);
         showToast(t('profile.photoDeleteError'), 'error');
       }
     },
-    [user, profileData.photos, showToast, t, setMyAvatar, setMyPhotos],
+    [user, profileData.photos, myAvatar, showToast, t, setMyAvatar, setMyPhotos],
   );
 
   /* ── Change password ── */
