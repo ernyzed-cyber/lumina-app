@@ -646,6 +646,10 @@ Deno.serve(async (req: Request) => {
     // Effective conversation history fed to Grok. Defaults to client-sent
     // `messages`; replaced by server-merged history when girlId+userId present.
     let effectiveHistory: ChatMessage[] = messages;
+    // Session boundary tracking — вычисляется в первом блоке `if (girlId && userId)`
+    // и потребляется во втором (где идёт основной upsert user_girl_state).
+    // null означает "не вычисляли / не пишем session_started_at в этом запросе".
+    let newSessionStartedAt: string | null = null;
 
     if (girlId && userId) {
       const lang: 'ru' | 'en' = body.lang === 'en' ? 'en' : 'ru';
@@ -766,7 +770,7 @@ Deno.serve(async (req: Request) => {
       const shouldCloseSession = sessionStartedAt !== null && gapMs >= SESSION_IDLE_MS;
       // Новая сессия начинается, если: (а) её ещё нет, или (б) только что закрыли.
       const startNewSession = sessionStartedAt === null || shouldCloseSession;
-      const newSessionStartedAt = startNewSession ? new Date(nowMs).toISOString() : sessionStartedAt;
+      newSessionStartedAt = startNewSession ? new Date(nowMs).toISOString() : sessionStartedAt;
 
       console.log('[chat-ai] session', {
         gapMin: Number.isFinite(gapMs) ? Math.round(gapMs / 60_000) : 'inf',
