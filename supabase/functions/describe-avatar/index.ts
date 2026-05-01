@@ -71,7 +71,7 @@ async function describeWithGrok(imageUrl: string): Promise<string> {
           role: 'user',
           content: [
             { type: 'text', text: VISION_PROMPT },
-            { type: 'image_url', image_url: { url: imageUrl, detail: 'low' } },
+            { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } },
           ],
         },
       ],
@@ -141,14 +141,16 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ ok: true, status: 'no_avatar' }), { headers: CORS });
   }
 
-  // Already described this exact URL → no-op, save tokens.
-  if (
-    profile?.avatar_described_url === avatarUrl &&
-    typeof profile?.avatar_description === 'string' &&
-    profile.avatar_description.length > 0
-  ) {
+  // Already processed this exact URL (either got a description or NO_PERSON) → no-op.
+  // We check only avatar_described_url — if it matches we already paid for this call.
+  // description can be null if NO_PERSON was returned; that's intentional.
+  if (profile?.avatar_described_url === avatarUrl) {
     return new Response(
-      JSON.stringify({ ok: true, status: 'cached', description: profile.avatar_description }),
+      JSON.stringify({
+        ok: true,
+        status: profile?.avatar_description ? 'cached' : 'cached_no_person',
+        description: profile?.avatar_description ?? null,
+      }),
       { headers: CORS },
     );
   }
@@ -156,6 +158,8 @@ Deno.serve(async (req) => {
   let description: string;
   try {
     description = await describeWithGrok(avatarUrl);
+    // Log raw output so we can diagnose NO_PERSON / unexpected responses in Supabase logs.
+    console.log('[describe-avatar] vision raw output:', JSON.stringify(description.slice(0, 300)));
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     // Don't poison the column on failure — leave whatever was there.
