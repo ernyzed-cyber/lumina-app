@@ -24,6 +24,9 @@ interface RequestPayload {
   userId?: string;
   system_prompt?: string;
   lang?: 'ru' | 'en';
+  // Absolute URLs of all girl photos (sent by frontend). Used once to lazily
+  // generate avatar_description via vision when it is null in girl_personas.
+  girl_photos?: string[];
 }
 
 const CORS_HEADERS: Record<string, string> = {
@@ -38,6 +41,95 @@ const GROK_MODEL = 'grok-4-1-fast-non-reasoning';
 
 const MEMORY_LIMIT = 3;
 const HISTORY_LIMIT = 30; // last N visible messages loaded from DB on the server
+
+// ---------------------------------------------------------------------------
+// Girl photo vision helpers (lazy background description)
+// ---------------------------------------------------------------------------
+
+const GIRL_VISION_PROMPT =
+  'Кратко опиши что изображено на фото: внешность человека, одежда, обстановка. ' +
+  '1–2 предложения, максимум 250 символов. Только факты, без оценок.';
+
+/** ArrayBuffer → base64 string without call-stack overflow. */
+function _bufToB64(buf: ArrayBuffer): string {
+  const bytes = new Uint8Array(buf);
+  let bin = '';
+  for (let i = 0; i < bytes.length; i += 8192) {
+    bin += String.fromCharCode(...bytes.subarray(i, i + 8192));
+  }
+  return btoa(bin);
+}
+
+/** Fetch a public image URL and return a base64 data-URL. */
+async function _photoToDataUrl(url: string): Promise<string> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} fetching ${url}`);
+  const mime = (res.headers.get('content-type') ?? 'image/jpeg').split(';')[0].trim();
+  return `data:${mime};base64,${_bufToB64(await res.arrayBuffer())}`;
+}
+
+/** Call Grok vision on a single data-URL and return the description text. */
+async function _describePhoto(dataUrl: string, apiKey: string): Promise<string> {
+  const res = await fetch(GROK_URL, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      model: GROK_MODEL,
+      temperature: 0.3,
+      max_tokens: 180,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'text', text: GIRL_VISION_PROMPT },
+          { type: 'image_url', image_url: { url: dataUrl, detail: 'auto' } },
+        ],
+      }],
+    }),
+  });
+  if (!res.ok) throw new Error(`grok vision ${res.status}`);
+  const data = await res.json();
+  return ((data?.choices?.[0]?.message?.content as string) ?? '').trim();
+}
+
+/**
+ * Background task: describe every girl photo, combine, save to girl_personas.
+ * Fires via waitUntil — does NOT block the main chat response.
+ */
+async function _describeGirlPhotosAsync(
+  girlId: string,
+  photoUrls: string[],
+  apiKey: string,
+  supabaseUrl: string,
+  serviceKey: string,
+): Promise<void> {
+  try {
+    const descriptions: string[] = [];
+    for (let i = 0; i < photoUrls.length; i++) {
+      try {
+        const dataUrl = await _photoToDataUrl(photoUrls[i]);
+        const desc = await _describePhoto(dataUrl, apiKey);
+        if (desc) descriptions.push(`Фото ${i + 1}: ${desc}`);
+      } catch (e) {
+        console.warn(`[chat-ai] vision photo ${i + 1} failed:`, e);
+      }
+    }
+    if (descriptions.length === 0) return;
+
+    const combined = descriptions.join('\n');
+    const db = createClient(supabaseUrl, serviceKey, { auth: { persistSession: false } });
+    const { error } = await db
+      .from('girl_personas')
+      .update({ avatar_description: combined })
+      .eq('id', girlId);
+    if (error) {
+      console.error('[chat-ai] save avatar_description failed:', error.message);
+    } else {
+      console.log(`[chat-ai] avatar_description saved for ${girlId} (${descriptions.length} photos)`);
+    }
+  } catch (e) {
+    console.error('[chat-ai] _describeGirlPhotosAsync error:', e);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Response timing (имитация живого человека)
@@ -709,7 +801,7 @@ Deno.serve(async (req: Request) => {
       const [personaRes, profileRes, memoriesRes, giftMemRes, relRes, historyRes, stateRes] = await Promise.all([
         supabase
           .from('girl_personas')
-          .select('system_prompt, name, timezone, city')
+          .select('system_prompt, name, timezone, city, avatar_description')
           .eq('id', girlId)
           .maybeSingle(),
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
@@ -811,8 +903,34 @@ Deno.serve(async (req: Request) => {
       const personaPrompt = personaRes.data?.system_prompt;
       const timezone = (personaRes.data?.timezone as string) || 'Europe/Moscow';
       const city = (personaRes.data?.city as string) || 'Москва';
+      const girlAvatarDesc = (personaRes.data?.avatar_description as string | null) ?? null;
       const profile = profileRes.data ?? null;
       const memories = memoriesRes.data ?? [];
+
+      // ── Lazy girl photo description (background, no latency) ──────────────
+      // If avatar_description is not yet set and the frontend provided photo
+      // URLs, describe all photos in the background (waitUntil).
+      // The current request won't include the appearance block, but every
+      // subsequent request will.
+      if (!girlAvatarDesc && Array.isArray(body.girl_photos) && body.girl_photos.length > 0) {
+        const grokKey = Deno.env.get('GROK_API_KEY')!;
+        const descTask = _describeGirlPhotosAsync(
+          girlId,
+          body.girl_photos,
+          grokKey,
+          supabaseUrl,
+          serviceKey,
+        );
+        // @ts-ignore EdgeRuntime is provided by Deno Deploy at runtime.
+        if (typeof EdgeRuntime !== 'undefined' && EdgeRuntime?.waitUntil) {
+          // @ts-ignore
+          EdgeRuntime.waitUntil(descTask);
+        } else {
+          descTask.catch((e) => console.error('[chat-ai] describeGirlPhotos error:', e));
+        }
+        console.log(`[chat-ai] triggered lazy vision for ${girlId} (${body.girl_photos.length} photos)`);
+      }
+      // ─────────────────────────────────────────────────────────────────────
 
       // Merge server history (authoritative) with client-sent messages.
       // Client may include the latest user message that's not yet persisted,
@@ -891,6 +1009,17 @@ Deno.serve(async (req: Request) => {
           // ── STABLE PREFIX (cacheable) ─────────────────────────────────
           personaPrompt,
           '',
+          ...(girlAvatarDesc
+            ? [
+                '=== YOUR APPEARANCE ===',
+                // Vision-generated description of this girl's photo.
+                // Use ONLY this when the user asks what you look like,
+                // wants you to describe yourself, or comments on your photo.
+                // NEVER invent a different appearance.
+                girlAvatarDesc,
+                '',
+              ]
+            : []),
           '=== PLATFORM CONTEXT ===',
           'You are chatting inside Lumina — a mobile dating/social app. Think of it like a messenger (similar look to Telegram or Instagram DM): left panel with a list of chats, right side shows the conversation. The app has a dark purple/pink aesthetic. You discovered this person through the app and started talking. You know it\'s an app, but you treat the conversation as real and personal — you don\'t constantly mention "the app", just like people don\'t say "I\'m texting you via Telegram" every message. If the user asks what app this is, you can say it\'s Lumina. You are NOT an AI assistant, you are a real girl who uses this app to meet people.',
           '',

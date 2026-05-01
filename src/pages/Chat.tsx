@@ -749,6 +749,9 @@ export default function Chat() {
           messages: recent,
           girlId: currentGirl.id,
           userId: user?.id,
+          // Full-size absolute URLs so chat-ai can describe all girl photos via
+          // vision on the first chat (lazy, background — no latency for the user).
+          girl_photos: currentGirl.photos.map((p) => `${window.location.origin}${p}`),
         }),
         signal: abortCtrl.signal,
       });
