@@ -55,7 +55,47 @@ interface DescribeBody {
   avatar_url?: string;
 }
 
-async function describeWithGrok(imageUrl: string): Promise<string> {
+/**
+ * Download image from Supabase Storage via admin client (bypasses any public-
+ * bucket access issues) and return it as a base64 data-URL so xAI never needs
+ * to fetch the image from an external host.
+ */
+async function fetchImageAsDataUrl(
+  admin: ReturnType<typeof import('https://esm.sh/@supabase/supabase-js@2.45.0').createClient>,
+  publicUrl: string,
+): Promise<string> {
+  // Extract the storage path from the public URL.
+  // URL format: .../storage/v1/object/public/avatars/<userId>/<filename>
+  const marker = '/object/public/avatars/';
+  const idx = publicUrl.indexOf(marker);
+  if (idx === -1) throw new Error(`Cannot parse storage path from URL: ${publicUrl}`);
+  const storagePath = publicUrl.slice(idx + marker.length);
+
+  const { data, error } = await admin.storage.from('avatars').download(storagePath);
+  if (error || !data) throw new Error(`Storage download failed: ${error?.message ?? 'no data'}`);
+
+  const buffer = await data.arrayBuffer();
+  const bytes = new Uint8Array(buffer);
+
+  // btoa works on latin1 strings; build one char per byte.
+  let binary = '';
+  const chunkSize = 8192;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  const base64 = btoa(binary);
+
+  const mimeType = data.type || 'image/jpeg';
+  return `data:${mimeType};base64,${base64}`;
+}
+
+async function describeWithGrok(
+  admin: ReturnType<typeof import('https://esm.sh/@supabase/supabase-js@2.45.0').createClient>,
+  imageUrl: string,
+): Promise<string> {
+  const dataUrl = await fetchImageAsDataUrl(admin, imageUrl);
+  console.log('[describe-avatar] image fetched, size ~', Math.round(dataUrl.length / 1024), 'KB (base64)');
+
   const res = await fetch(GROK_URL, {
     method: 'POST',
     headers: {
@@ -71,7 +111,7 @@ async function describeWithGrok(imageUrl: string): Promise<string> {
           role: 'user',
           content: [
             { type: 'text', text: VISION_PROMPT },
-            { type: 'image_url', image_url: { url: imageUrl, detail: 'auto' } },
+            { type: 'image_url', image_url: { url: dataUrl, detail: 'auto' } },
           ],
         },
       ],
@@ -157,7 +197,7 @@ Deno.serve(async (req) => {
 
   let description: string;
   try {
-    description = await describeWithGrok(avatarUrl);
+    description = await describeWithGrok(admin, avatarUrl);
     // Log raw output so we can diagnose NO_PERSON / unexpected responses in Supabase logs.
     console.log('[describe-avatar] vision raw output:', JSON.stringify(description.slice(0, 300)));
   } catch (err) {
