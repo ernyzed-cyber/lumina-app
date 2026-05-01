@@ -37,19 +37,7 @@ const CORS = {
   'Content-Type': 'application/json',
 };
 
-const VISION_PROMPT = `You are an honest visual describer. Look at the photo of a man (the user of a dating-style chat app) and produce ONE compact paragraph in Russian, 2-3 sentences, max 350 characters.
-
-Describe:
-- Appearance: approximate age range, hair (color, length, style), facial features, build (slim / average / athletic / heavy), skin tone, beard/clean-shaven, glasses, distinctive marks if obvious.
-- Context: where the photo seems to be taken (indoor/outdoor, location type if recognisable), what he is wearing, mood/expression, overall vibe of the shot.
-
-Rules:
-- Be neutral and factual. No flattery, no insults, no judgement of attractiveness.
-- If something is unclear or hidden, say "не видно" rather than guessing.
-- Russian language, plain prose, no bullet points, no headings, no quotes.
-- If the image does not show a person at all (logo, landscape, animal), reply with exactly: NO_PERSON
-
-Return only the description text (or NO_PERSON). No prefix, no suffix.`;
+const VISION_PROMPT = `Кратко опиши что изображено на фото. 1-2 предложения, максимум 300 символов. Только факты: кто/что на фото, обстановка, внешний вид если есть человек. Без оценок и лишних слов.`;
 
 interface DescribeBody {
   avatar_url?: string;
@@ -186,11 +174,7 @@ Deno.serve(async (req) => {
   // description can be null if NO_PERSON was returned; that's intentional.
   if (profile?.avatar_described_url === avatarUrl) {
     return new Response(
-      JSON.stringify({
-        ok: true,
-        status: profile?.avatar_description ? 'cached' : 'cached_no_person',
-        description: profile?.avatar_description ?? null,
-      }),
+      JSON.stringify({ ok: true, status: 'cached', description: profile?.avatar_description ?? null }),
       { headers: CORS },
     );
   }
@@ -212,15 +196,10 @@ Deno.serve(async (req) => {
   // Trim to a hard ceiling so prompts stay bounded even if model ignores limit.
   if (description.length > 600) description = description.slice(0, 600);
 
-  // NO_PERSON sentinel: store NULL description but remember which URL we
-  // examined, so we don't re-pay to describe the same non-person image again.
-  const isNoPerson = /^NO_PERSON\b/i.test(description.trim());
-  const finalDescription = isNoPerson ? null : description;
-
   const { error: updErr } = await admin
     .from('profiles')
     .update({
-      avatar_description: finalDescription,
+      avatar_description: description,
       avatar_described_url: avatarUrl,
       updated_at: new Date().toISOString(),
     })
@@ -234,11 +213,7 @@ Deno.serve(async (req) => {
   }
 
   return new Response(
-    JSON.stringify({
-      ok: true,
-      status: isNoPerson ? 'no_person' : 'described',
-      description: finalDescription,
-    }),
+    JSON.stringify({ ok: true, status: 'described', description }),
     { headers: CORS },
   );
 });
