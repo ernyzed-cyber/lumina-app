@@ -31,7 +31,6 @@ import s from './Feed.module.css';
 
 /* ── Constants ── */
 const SWIPE_THRESHOLD = 120;
-const SWIPE_UP_THRESHOLD = 100;
 const ROTATION_FACTOR = 15;
 const MATCH_DELAY_MIN = 2000;
 const MATCH_DELAY_MAX = 5000;
@@ -100,15 +99,15 @@ interface SwipeCardProps {
   onTriggerComplete: () => void;
   t: (key: string, params?: Record<string, string | number>) => string;
   shouldReduceMotion: boolean | null;
+  telegramVerified: boolean | null;
 }
 
-function SwipeCard({ girl, isTop, onSwipe, onTap, triggerSwipe, onTriggerComplete, t, shouldReduceMotion }: SwipeCardProps) {
+function SwipeCard({ girl, isTop, onSwipe, onTap, triggerSwipe, onTriggerComplete, t, shouldReduceMotion, telegramVerified }: SwipeCardProps) {
   const x = useMotionValue(0);
   const y = useMotionValue(0);
   const rotate = useTransform(x, [-300, 0, 300], [-ROTATION_FACTOR, 0, ROTATION_FACTOR]);
   const likeOpacity = useTransform(x, [0, SWIPE_THRESHOLD], [0, 1]);
   const nopeOpacity = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0]);
-  const superLikeOpacity = useTransform(y, [-SWIPE_UP_THRESHOLD, 0], [1, 0]);
 
   const [exiting, setExiting] = useState(false);
   const dragStartRef = useRef<{ x: number; y: number } | null>(null);
@@ -137,13 +136,6 @@ function SwipeCard({ girl, isTop, onSwipe, onTap, triggerSwipe, onTriggerComplet
 
   function handleDragEnd(_: unknown, info: PanInfo) {
     const { offset, velocity } = info;
-
-    // Swipe up = superlike
-    if (offset.y < -SWIPE_UP_THRESHOLD || velocity.y < -500) {
-      setExiting(true);
-      onSwipe('up');
-      return;
-    }
 
     // Swipe right = like
     if (offset.x > SWIPE_THRESHOLD || velocity.x > 500) {
@@ -177,11 +169,12 @@ function SwipeCard({ girl, isTop, onSwipe, onTap, triggerSwipe, onTriggerComplet
           ? { x, y, rotate, zIndex: 10 }
           : { scale: 0.95, y: 10, zIndex: 5, opacity: 0.7 }
       }
-      drag={isTop && !exiting && !shouldReduceMotion ? 'x' : false}
+      drag={isTop && !exiting && !shouldReduceMotion && telegramVerified !== false ? 'x' : false}
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       dragElastic={0.9}
-      onDragStart={isTop && !shouldReduceMotion ? handleDragStart : undefined}
-      onDragEnd={isTop && !shouldReduceMotion ? handleDragEnd : undefined}
+      onPointerDown={isTop && telegramVerified === false ? onTap : undefined}
+      onDragStart={isTop && !shouldReduceMotion && telegramVerified !== false ? handleDragStart : undefined}
+      onDragEnd={isTop && !shouldReduceMotion && telegramVerified !== false ? handleDragEnd : undefined}
       initial={shouldReduceMotion ? { opacity: isTop ? 1 : 0.7 } : { scale: isTop ? 1 : 0.95, opacity: isTop ? 1 : 0.7 }}
       animate={
         exiting
@@ -250,9 +243,6 @@ function SwipeCard({ girl, isTop, onSwipe, onTap, triggerSwipe, onTriggerComplet
           </motion.div>
           <motion.div className={`${s.swipeLabel} ${s.swipeLabelNope}`} style={{ opacity: nopeOpacity }}>
             {t('feed.swipeNope')}
-          </motion.div>
-          <motion.div className={`${s.swipeLabel} ${s.swipeLabelSuper}`} style={{ opacity: superLikeOpacity }}>
-            {t('feed.swipeSuper')}
           </motion.div>
         </>
       )}
@@ -610,11 +600,18 @@ export default function Feed() {
                         girl={girl}
                         isTop={i === 0}
                         onSwipe={handleSwipe}
-                        onTap={() => openDrawer(girl)}
+                        onTap={() => {
+                          if (telegramVerified === false) {
+                            setVerifyModalOpen(true);
+                          } else {
+                            openDrawer(girl);
+                          }
+                        }}
                         triggerSwipe={i === 0 ? triggerSwipe : null}
                         onTriggerComplete={() => setTriggerSwipe(null)}
                         t={t}
                         shouldReduceMotion={shouldReduceMotion}
+                        telegramVerified={telegramVerified}
                       />
                     ))}
                   </AnimatePresence>
@@ -635,30 +632,36 @@ export default function Feed() {
                 </div>
               )}
 
-              {/* ── Action Buttons (new design: chat / heart / fire) ── */}
+              {/* ── Action Buttons (new design: cross / heart) ── */}
               {!isOutOfCards && (
                 <div className={s.actionButtons}>
                   <motion.button
-                    className={`${s.actionBtn} ${s.actionBtnChat}`}
-                    onClick={async () => {
-                      const girl = girls[currentIndex];
-                      if (!girl) return;
-                      if (telegramVerified === false) return;
-                      const { error: aError } = await createAssignment(girl.id);
-                      if (!aError) navigate('/chat', { replace: true });
-                      else if (aError === 'girl_taken') setCurrentIndex((prev) => prev + 1);
+                    className={`${s.actionBtn} ${s.actionBtnNope}`}
+                    onClick={() => {
+                      if (telegramVerified === false) {
+                        setVerifyModalOpen(true);
+                        return;
+                      }
+                      setTriggerSwipe('left');
                     }}
-                    aria-label={t('feed.sendMessage')}
+                    disabled={telegramVerified === false}
+                    aria-label={t('feed.swipeNope')}
                     whileTap={shouldReduceMotion ? undefined : { scale: 0.85 }}
+                    whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
                     transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 15 }}
                   >
-                    <MessageCircle size={24} />
+                    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+                      <path d="M18 6L6 18M6 6l12 12" />
+                    </svg>
                   </motion.button>
 
                   <motion.button
                     className={`${s.actionBtn} ${s.actionBtnLike}`}
                     onClick={() => {
-                      if (telegramVerified === false) return;
+                      if (telegramVerified === false) {
+                        setVerifyModalOpen(true);
+                        return;
+                      }
                       setTriggerSwipe('right');
                     }}
                     disabled={telegramVerified === false}
@@ -668,29 +671,6 @@ export default function Feed() {
                     transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 15 }}
                   >
                     <Heart size={28} />
-                  </motion.button>
-
-                  <motion.button
-                    className={`${s.actionBtn} ${s.actionBtnFire}`}
-                    onClick={() => {
-                      if (telegramVerified === false) return;
-                      setTriggerSwipe('up');
-                    }}
-                    disabled={telegramVerified === false}
-                    aria-label={t('feed.superLikeAriaLabel')}
-                    whileTap={shouldReduceMotion ? undefined : { scale: 0.85 }}
-                    whileHover={shouldReduceMotion ? undefined : { scale: 1.12 }}
-                    transition={shouldReduceMotion ? { duration: 0 } : { type: 'spring', stiffness: 400, damping: 15 }}
-                  >
-                    <svg width="28" height="28" viewBox="0 0 24 24" fill="url(#feedFireGrad)">
-                      <defs>
-                        <linearGradient id="feedFireGrad" x1="0%" y1="100%" x2="100%" y2="0%">
-                          <stop offset="0%" stopColor="#F97316" />
-                          <stop offset="100%" stopColor="#EC4899" />
-                        </linearGradient>
-                      </defs>
-                      <path d="M12 2c.5 4-2 6-2 10 0 2.5 2 4 4 4s4-1.5 4-4c0-6-6-10-6-10zm-2 16c-1.5 0-3-1-3-3 0-2 1.5-3 3-4 1.5 1 3 2 3 4s-1.5 3-3 3z" />
-                    </svg>
                   </motion.button>
                 </div>
               )}

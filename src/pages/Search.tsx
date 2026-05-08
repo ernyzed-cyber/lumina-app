@@ -6,15 +6,16 @@ import FilterPanel from '../components/filters/FilterPanel';
 import GirlProfileDrawer, { type GirlProfileLabels } from '../components/GirlProfile/GirlProfileDrawer';
 import { useAuth } from '../hooks/useAuth';
 import { useAssignment } from '../hooks/useAssignment';
+import { useTelegramVerified } from '../hooks/useTelegramVerified';
 import { useLanguage } from '../i18n';
 import { getLocalizedGirls, type Girl } from '../data/girls';
 import type { FilterState } from '../types/filters';
 import { DEFAULT_FILTERS } from '../types/filters';
 import { storage } from '../utils/helpers';
+import VerificationModal from '../components/VerificationModal';
 import s from './Search.module.css';
 
 const FILTERS_KEY = 'searchFilters';
-const PROMO_POSITIONS = [0, 5];
 
 /* ── Filter matching (same logic as Feed) ── */
 function matchesFilters(girl: Girl, f: FilterState): boolean {
@@ -39,17 +40,30 @@ function matchesFilters(girl: Girl, f: FilterState): boolean {
   return true;
 }
 
-type GridItem =
-  | { type: 'girl'; girl: Girl }
-  | { type: 'promo'; variant: 'boost' | 'views' };
+type GridItem = { type: 'girl'; girl: Girl };
 
 export default function Search() {
   const { user, loading: authLoading } = useAuth();
-  const { activeGirlId, takenGirlIds, takenLoading } = useAssignment();
+  const { activeGirlId, takenGirlIds, takenLoading, createAssignment } = useAssignment();
+  const { isVerified: telegramVerified } = useTelegramVerified();
   const navigate = useNavigate();
   const { t, lang } = useLanguage();
 
   const allGirls = useMemo(() => getLocalizedGirls(lang), [lang]);
+
+  /* ── Likes Limit ── */
+  const [likesCount, setLikesCount] = useState<number>(() => {
+    return storage.load<number>('searchLikesCount', 0) ?? 0;
+  });
+
+  const remainingLikes = Math.max(0, 5 - likesCount);
+
+  useEffect(() => {
+    storage.save('searchLikesCount', likesCount);
+  }, [likesCount]);
+
+  /* ── Verification Modal ── */
+  const [verifyModalOpen, setVerifyModalOpen] = useState(false);
 
   /* ── Filters ── */
   const [filters, setFilters] = useState<FilterState>(() =>
@@ -91,27 +105,9 @@ export default function Search() {
     }
   }, [user, authLoading, navigate]);
 
-  /* ── Build grid with promo cards inserted ── */
+  /* ── Build grid ── */
   const gridItems = useMemo<GridItem[]>(() => {
-    const items: GridItem[] = [];
-    let girlIdx = 0;
-    let promoIdx = 0;
-    let pos = 0;
-
-    while (girlIdx < girls.length || promoIdx < PROMO_POSITIONS.length) {
-      if (promoIdx < PROMO_POSITIONS.length && pos === PROMO_POSITIONS[promoIdx]) {
-        items.push({ type: 'promo', variant: promoIdx === 0 ? 'boost' : 'views' });
-        promoIdx++;
-        pos++;
-      } else if (girlIdx < girls.length) {
-        items.push({ type: 'girl', girl: girls[girlIdx] });
-        girlIdx++;
-        pos++;
-      } else {
-        promoIdx++; // skip remaining promos if no more girls
-      }
-    }
-    return items;
+    return girls.map(girl => ({ type: 'girl', girl }));
   }, [girls]);
 
   /* ── Filter panel labels ── */
@@ -275,19 +271,38 @@ export default function Search() {
             {/* ── Header ── */}
             <div className={s.searchHeader}>
               <h1 className={s.searchTitle}>{t('feed.tabs.search')}</h1>
-              <button
-                className={s.filterBtn}
-                onClick={() => setFilterOpen(true)}
-                type="button"
-                aria-label={t('filters.title')}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="4" y1="6" x2="20" y2="6" />
-                  <line x1="8" y1="12" x2="16" y2="12" />
-                  <line x1="11" y1="18" x2="13" y2="18" />
-                </svg>
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span className={s.likesCounter}>
+                  Лайки: {remainingLikes}/5
+                </span>
+                <button
+                  className={s.filterBtn}
+                  onClick={() => setFilterOpen(true)}
+                  type="button"
+                  aria-label={t('filters.title')}
+                >
+                  <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="4" y1="6" x2="20" y2="6" />
+                    <line x1="8" y1="12" x2="16" y2="12" />
+                    <line x1="11" y1="18" x2="13" y2="18" />
+                  </svg>
+                </button>
+              </div>
             </div>
+
+            {/* ── Verification banner for unverified users ── */}
+            {telegramVerified === false && (
+              <div className={s.verificationBanner}>
+                <span>{t('verification.likesBlocked')}</span>
+                <button
+                  type="button"
+                  className={s.verifyNowBtn}
+                  onClick={() => setVerifyModalOpen(true)}
+                >
+                  {t('verification.verifyBtn')}
+                </button>
+              </div>
+            )}
 
             {/* ── Gallery Grid ── */}
             <div className={s.galleryGrid}>
@@ -304,45 +319,6 @@ export default function Search() {
                 </div>
               ) : (
                 gridItems.map((item) => {
-                  if (item.type === 'promo') {
-                    const isBoost = item.variant === 'boost';
-                    return (
-                      <div
-                        key={`promo-${item.variant}`}
-                        className={`${s.promoCard} ${isBoost ? s.promoCardPink : s.promoCardPurple}`}
-                        onClick={() => navigate('/shop')}
-                        role="button"
-                        tabIndex={0}
-                      >
-                        <div className={s.promoIcon}>
-                          {isBoost ? (
-                            /* Arrow up / boost icon */
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor">
-                              <path d="M12 3l-1.4 1.4L16.2 10H4v2h12.2l-5.6 5.6L12 19l8-8z" />
-                              <path d="M12 3l-1.4 1.4L16.2 10H4v2h12.2l-5.6 5.6L12 19l8-8z" transform="rotate(-90 12 12)" />
-                            </svg>
-                          ) : (
-                            /* Eye / views icon */
-                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z" />
-                              <circle cx="12" cy="12" r="3" fill="currentColor" />
-                            </svg>
-                          )}
-                        </div>
-                        <p className={s.promoText}>
-                          {isBoost
-                            ? t('search.promoBoost')
-                            : t('search.promoViews')}
-                        </p>
-                        <button className={s.promoBtn} type="button">
-                          {isBoost
-                            ? t('search.promoBoostBtn')
-                            : t('search.promoViewsBtn')}
-                        </button>
-                      </div>
-                    );
-                  }
-
                   const girl = item.girl;
                   return (
                     <div
@@ -388,10 +364,29 @@ export default function Search() {
           girl={selectedGirl}
           onClose={closeDrawer}
           t={drawerLabels}
-          onChat={(g) => {
+          onLike={async (g) => {
+            if (telegramVerified === false) {
+              closeDrawer();
+              setVerifyModalOpen(true);
+              return;
+            }
+            if (remainingLikes <= 0) {
+              alert('Вы исчерпали лимит лайков на сегодня.');
+              return;
+            }
+            setLikesCount((prev) => prev + 1);
+            const { error: aError } = await createAssignment(g.id);
             closeDrawer();
-            navigate(`/chat?girl=${g.id}`);
+            if (!aError) {
+              navigate('/chat', { replace: true });
+            }
           }}
+        />
+
+        {/* ── Verification Modal ── */}
+        <VerificationModal
+          open={verifyModalOpen}
+          onClose={() => setVerifyModalOpen(false)}
         />
       </div>
     </PageTransition>

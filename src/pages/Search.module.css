@@ -274,7 +274,54 @@
 }
 
 @media (max-width: 400px) {
-  .galleryGrid {
+.likesCounter {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  border-radius: var(--radius-full);
+  background: rgba(244, 63, 94, 0.1);
+  border: 1px solid rgba(244, 63, 94, 0.2);
+  color: var(--like);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 600;
+}
+
+.verificationBanner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 10px 16px;
+  border-radius: 12px;
+  background: rgba(255, 170, 0, 0.08);
+  border: 1px solid rgba(255, 170, 0, 0.2);
+  color: #ffaa00;
+  font-size: 13px;
+  text-align: center;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.verifyNowBtn {
+  padding: 6px 16px;
+  border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s;
+  white-space: nowrap;
+}
+
+.verifyNowBtn:hover {
+  opacity: 0.85;
+}
+
+.galleryGrid {
     gap: 8px;
   }
 
