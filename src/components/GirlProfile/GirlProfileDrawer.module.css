@@ -415,65 +415,53 @@
 
 /* Bottom spacer */
 .bottomSpacer {
-  height: 80px;
+  height: 16px;
 }
 
 /* ── Sticky action bar ── */
 .actionBar {
-  position: absolute;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 20px;
-  padding: 14px 20px;
-  background: linear-gradient(transparent, var(--bg-primary) 30%);
-  pointer-events: none;
+  flex-shrink: 0;
+  padding: 12px 16px 16px;
+  background: var(--bg-primary);
+  border-top: 1px solid var(--border-subtle);
   border-radius: 0 0 var(--radius-xl) var(--radius-xl);
 }
 
-.actionBar > * {
-  pointer-events: auto;
-}
-
-.actionBtn {
+/* ── Full-width like button ── */
+.actionLikeBtn {
+  width: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
+  gap: 10px;
+  padding: 15px 24px;
   border: none;
-  background: var(--bg-card);
-  color: var(--text-primary);
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, #f43f5e 0%, #ec4899 100%);
+  color: #fff;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  letter-spacing: 0.2px;
   cursor: pointer;
-  box-shadow: var(--shadow-md);
-  transition: transform var(--duration-fast) var(--ease-bounce),
-              box-shadow var(--duration-fast) var(--ease-smooth);
+  box-shadow: 0 4px 20px rgba(244, 63, 94, 0.38);
+  transition: opacity 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
 }
 
-.actionBtn:hover {
-  transform: scale(1.08);
-  box-shadow: var(--shadow-lg);
+.actionLikeBtn:hover {
+  opacity: 0.9;
+  transform: scale(1.02);
+  box-shadow: 0 6px 28px rgba(244, 63, 94, 0.5);
 }
 
-.actionBtn:active {
-  transform: scale(0.95);
+.actionLikeBtn:active {
+  transform: scale(0.97);
+  opacity: 1;
 }
 
-.actionLike {
-  width: 56px;
-  height: 56px;
-  color: var(--accent-rose);
-}
-
-.actionFire {
-  width: 56px;
-  height: 56px;
-  background: var(--bg-card);
-}
+/* Legacy — kept for safety, no longer rendered */
+.actionBtn { display: none; }
+.actionLike { display: none; }
+.actionFire { display: none; }
 
 /* ═══════════════════════════════════════════
    Responsive — mobile

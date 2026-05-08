@@ -1,5 +1,5 @@
 /* ═══════════════════════════════════════════
-   LUMINA — Search Page (Gallery + Promo)
+   LUMINA — Search Page (Gallery)
    ═══════════════════════════════════════════ */
 
 /* ── Layout ── */
@@ -23,7 +23,7 @@
 .searchContainer {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
   width: 100%;
   max-width: 600px;
   margin: 0 auto;
@@ -49,6 +49,36 @@
   user-select: none;
 }
 
+.searchHeaderRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Likes counter badge ── */
+.likesCounter {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 7px 14px;
+  border-radius: var(--radius-full);
+  background: linear-gradient(135deg, rgba(244, 63, 94, 0.15), rgba(236, 72, 153, 0.1));
+  border: 1px solid rgba(244, 63, 94, 0.3);
+  color: #f87171;
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  white-space: nowrap;
+}
+
+.likesCounter::before {
+  content: '♥';
+  font-size: 12px;
+  opacity: 0.9;
+}
+
+/* ── Filter Button ── */
 .filterBtn {
   display: flex;
   align-items: center;
@@ -61,12 +91,65 @@
   color: var(--text-secondary);
   cursor: pointer;
   transition: all var(--duration-normal) var(--ease-smooth);
+  flex-shrink: 0;
 }
 
 .filterBtn:hover {
   border-color: var(--accent-purple);
   color: var(--text-accent);
   background: rgba(139, 92, 246, 0.08);
+}
+
+/* ── Verification Banner ── */
+.verificationBanner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: linear-gradient(135deg, rgba(251, 146, 60, 0.08), rgba(245, 158, 11, 0.06));
+  border: 1px solid rgba(251, 146, 60, 0.25);
+}
+
+.verificationBannerText {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: #fb923c;
+  line-height: 1.4;
+  flex: 1;
+}
+
+.verificationBannerIcon {
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.verifyNowBtn {
+  flex-shrink: 0;
+  padding: 8px 18px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  border: none;
+  cursor: pointer;
+  transition: opacity 0.2s, transform 0.15s;
+  white-space: nowrap;
+  letter-spacing: 0.1px;
+}
+
+.verifyNowBtn:hover {
+  opacity: 0.88;
+  transform: scale(1.03);
+}
+
+.verifyNowBtn:active {
+  transform: scale(0.97);
 }
 
 /* ── Gallery Grid ── */
@@ -144,85 +227,6 @@
   margin-left: 2px;
 }
 
-/* ── Promo Card ── */
-.promoCard {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 20px 16px;
-  border-radius: var(--radius-xl);
-  cursor: pointer;
-  text-align: center;
-  transition: transform var(--duration-normal) var(--ease-smooth),
-              box-shadow var(--duration-normal) var(--ease-smooth);
-  /* Match gallery card height */
-  min-height: 0;
-  aspect-ratio: 3 / 4;
-}
-
-.promoCard:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
-}
-
-/* Pink variant — "Boost profile" */
-.promoCardPink {
-  background: linear-gradient(135deg, #FDE8F0 0%, #FCE4EC 50%, #F8BBD0 100%);
-  color: #C2185B;
-}
-
-/* Purple variant — "Guaranteed views" */
-.promoCardPurple {
-  background: linear-gradient(135deg, #EDE7F6 0%, #E8DEF8 50%, #D1C4E9 100%);
-  color: #7B1FA2;
-}
-
-.promoIcon {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 64px;
-  height: 64px;
-}
-
-.promoText {
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 500;
-  line-height: 1.45;
-  padding: 0 4px;
-}
-
-.promoBtn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 8px 20px;
-  border-radius: var(--radius-full);
-  border: none;
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-  cursor: pointer;
-  transition: opacity var(--duration-fast) ease;
-}
-
-.promoCardPink .promoBtn {
-  background: rgba(194, 24, 91, 0.15);
-  color: #C2185B;
-}
-
-.promoCardPurple .promoBtn {
-  background: rgba(123, 31, 162, 0.15);
-  color: #7B1FA2;
-}
-
-.promoBtn:hover {
-  opacity: 0.8;
-}
-
 /* ── Empty State ── */
 .galleryEmpty {
   grid-column: 1 / -1;
@@ -274,54 +278,7 @@
 }
 
 @media (max-width: 400px) {
-.likesCounter {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  border-radius: var(--radius-full);
-  background: rgba(244, 63, 94, 0.1);
-  border: 1px solid rgba(244, 63, 94, 0.2);
-  color: var(--like);
-  font-family: var(--font-body);
-  font-size: var(--text-sm);
-  font-weight: 600;
-}
-
-.verificationBanner {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 10px 16px;
-  border-radius: 12px;
-  background: rgba(255, 170, 0, 0.08);
-  border: 1px solid rgba(255, 170, 0, 0.2);
-  color: #ffaa00;
-  font-size: 13px;
-  text-align: center;
-  flex-wrap: wrap;
-  margin-bottom: 8px;
-}
-
-.verifyNowBtn {
-  padding: 6px 16px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--accent-purple), var(--accent-pink));
-  color: #fff;
-  font-size: 13px;
-  font-weight: 600;
-  border: none;
-  cursor: pointer;
-  transition: opacity 0.2s;
-  white-space: nowrap;
-}
-
-.verifyNowBtn:hover {
-  opacity: 0.85;
-}
-
-.galleryGrid {
+  .galleryGrid {
     gap: 8px;
   }
 
@@ -334,12 +291,8 @@
     font-size: var(--text-sm);
   }
 
-  .promoCard {
-    padding: 14px 10px;
-    gap: 8px;
-  }
-
-  .promoText {
-    font-size: var(--text-xs);
+  .likesCounter {
+    font-size: 11px;
+    padding: 5px 10px;
   }
 }
