@@ -91,6 +91,8 @@ interface Props {
   onSuperLike?: (girl: Girl) => void;
   /** Hide the sticky action bar (chat / like / super-like). Useful when opened from within Chat page. */
   hideActionBar?: boolean;
+  /** When false, the like button is rendered disabled (unverified user). */
+  isVerified?: boolean | null;
 }
 
 /* ── Helpers ── */
@@ -218,7 +220,7 @@ const modalVariants = {
 
 /* ── Main component ── */
 
-export default function GirlProfileDrawer({ open, girl, onClose, t, onLike, hideActionBar }: Props) {
+export default function GirlProfileDrawer({ open, girl, onClose, t, onLike, hideActionBar, isVerified }: Props) {
   const navigate = useNavigate();
   const { gifts: receivedGifts } = useGirlGifts(girl?.id ?? null);
 
@@ -470,6 +472,8 @@ export default function GirlProfileDrawer({ open, girl, onClose, t, onLike, hide
                   className={styles.actionLikeBtn}
                   type="button"
                   onClick={() => { if (onLike && girl) onLike(girl); }}
+                  disabled={isVerified === false}
+                  aria-disabled={isVerified === false}
                 >
                   <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
                     <path d="M20.84 4.61a5.5 5.5 0 00-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 00-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 000-7.78z" />

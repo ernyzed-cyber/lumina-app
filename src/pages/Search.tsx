@@ -364,6 +364,7 @@ export default function Search() {
           girl={selectedGirl}
           onClose={closeDrawer}
           t={drawerLabels}
+          isVerified={telegramVerified}
           onLike={async (g) => {
             if (telegramVerified === false) {
               closeDrawer();

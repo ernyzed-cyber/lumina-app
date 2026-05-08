@@ -930,6 +930,12 @@ export default function Chat() {
       const content = (text ?? input).trim();
       if (!content || !currentGirl) return;
 
+      // Блокируем отправку для неверифицированных пользователей.
+      if (telegramVerified === false) {
+        setVerifyModalOpen(true);
+        return;
+      }
+
       // Если AI ещё печатает / в процессе ответа — НЕ принимаем второе сообщение.
       // Читаем актуальное значение из ref'а: state-версия awaitingReply в deps
       // привела бы к пересозданию useCallback и каскаду ре-рендеров.
@@ -1013,7 +1019,7 @@ export default function Chat() {
         setAwaitingReply(false);
       }
     },
-    [input, currentGirl, tr, t, showToast, saveMessage, messagesLeft, runAiTurn],
+    [input, currentGirl, tr, t, showToast, saveMessage, messagesLeft, runAiTurn, telegramVerified],
   );
 
   /* ── Enter to send ── */
@@ -1226,7 +1232,7 @@ export default function Chat() {
             </AnimatePresence>
 
             {/* ── Quick replies ── */}
-            {messages.length === 0 && (
+            {messages.length === 0 && telegramVerified !== false && (
               <div className={s.quickReplies} role="group" aria-label={t('chat.quickRepliesAriaLabel')}>
                 {QUICK_REPLIES.map((text) => (
                   <button
