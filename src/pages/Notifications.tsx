@@ -12,9 +12,7 @@ import {
 } from 'lucide-react';
 import Navbar from '../components/layout/Navbar';
 import PageTransition from '../components/layout/PageTransition';
-import EmptyState from '../components/ui/EmptyState';
 import { useAuth } from '../hooks/useAuth';
-import { useAssignment } from '../hooks/useAssignment';
 import { useNotifications } from '../hooks/useNotifications';
 import { useToast } from '../hooks/useToast';
 import { useLanguage } from '../i18n';
@@ -157,7 +155,6 @@ export default function Notifications() {
   const { user, loading: authLoading } = useAuth();
   const { showToast, ToastContainer } = useToast();
   const { t } = useLanguage();
-  const { activeGirlId } = useAssignment();
   const { markLocalRead, markAllLocalRead, markManyLocalRead, markManyLocalDeleted, readIds, deletedIds, refresh } = useNotifications();
   const navigate = useNavigate();
 
@@ -383,26 +380,6 @@ export default function Notifications() {
   }
 
   if (!user) return null;
-
-  /* ── No active girl → EmptyState with CTA to /feed ── */
-  if (!activeGirlId) {
-    return (
-      <PageTransition>
-        <div className={s.page}>
-          <Navbar />
-          <main className={s.main}>
-            <EmptyState
-              icon={<Bell size={56} strokeWidth={1.5} />}
-              title={t('notifications.noGirlTitle')}
-              description={t('notifications.noGirlText')}
-              ctaLabel={t('notifications.noGirlCta')}
-              ctaTo="/feed"
-            />
-          </main>
-        </div>
-      </PageTransition>
-    );
-  }
 
   return (
     <PageTransition>
