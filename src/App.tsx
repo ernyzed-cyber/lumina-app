@@ -20,56 +20,6 @@ const Shop = lazy(() => import('./pages/Shop'));
 const Waitlist = lazy(() => import('./pages/Waitlist'));
 const Released = lazy(() => import('./pages/Released'));
 
-/* ── Dev-only: redesign preview catalog (НЕ попадает в production-билд) ── */
-// @ts-ignore
-const PreviewLayout = import.meta.env.DEV
-  ? lazy(() => import('./preview/PreviewLayout'))
-  : null;
-// @ts-ignore
-const PreviewIndex = import.meta.env.DEV
-  ? lazy(() => import('./preview/PreviewIndex'))
-  : null;
-// @ts-ignore
-const PreviewPrimitives = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Primitives'))
-  : null;
-// @ts-ignore
-const PreviewNavigation = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Navigation'))
-  : null;
-// @ts-ignore
-const PreviewLanding = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Landing'))
-  : null;
-// @ts-ignore
-const PreviewAuth = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Auth'))
-  : null;
-// @ts-ignore
-const PreviewHome = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Home'))
-  : null;
-// @ts-ignore
-const PreviewMemories = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Memories'))
-  : null;
-// @ts-ignore
-const PreviewChat = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Chat'))
-  : null;
-// @ts-ignore
-const PreviewFeed = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Feed'))
-  : null;
-// @ts-ignore
-const PreviewSearch = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Search'))
-  : null;
-// @ts-ignore
-const PreviewProfile = import.meta.env.DEV
-  ? lazy(() => import('./pages-redesign/Profile'))
-  : null;
-
 /* ── Фоллбэк при загрузке чанка ── */
 function PageLoader() {
   return (
@@ -130,23 +80,6 @@ function App() {
           <Route path="/waitlist" element={<Waitlist />} />
           <Route path="/released" element={<Released />} />
         </Route>
-
-        {/* Dev-only: redesign preview catalog. Tree-shaken in production. */}
-        {import.meta.env.DEV && PreviewLayout && PreviewIndex && PreviewPrimitives && PreviewNavigation && PreviewLanding && PreviewAuth && PreviewHome && PreviewMemories && PreviewChat && PreviewFeed && PreviewSearch && PreviewProfile && (
-          <Route path="/__preview" element={<PreviewLayout />}>
-            <Route index element={<PreviewIndex />} />
-            <Route path="primitives" element={<PreviewPrimitives />} />
-            <Route path="nav" element={<PreviewNavigation />} />
-            <Route path="landing" element={<PreviewLanding />} />
-            <Route path="auth" element={<PreviewAuth />} />
-            <Route path="home" element={<PreviewHome />} />
-            <Route path="memories" element={<PreviewMemories />} />
-            <Route path="chat" element={<PreviewChat />} />
-            <Route path="feed" element={<PreviewFeed />} />
-            <Route path="search" element={<PreviewSearch />} />
-            <Route path="profile" element={<PreviewProfile />} />
-          </Route>
-        )}
       </Routes>
     </Suspense>
   );
