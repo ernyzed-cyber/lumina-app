@@ -194,9 +194,9 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: var(--text-primary);
+  background: #ffffff;
   transition: transform var(--duration-normal) var(--ease-spring);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
 }
 
 .toggleOn .toggleThumb {
