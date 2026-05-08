@@ -1,0 +1,272 @@
+/* Memories page — vertical timeline over a dimmed StarField. */
+
+.page {
+  position: relative;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  background: radial-gradient(
+      ellipse at 50% -10%,
+      rgba(139, 92, 246, 0.16) 0%,
+      transparent 50%
+    ),
+    radial-gradient(
+      ellipse at 50% 110%,
+      rgba(236, 72, 153, 0.1) 0%,
+      transparent 50%
+    ),
+    #0f0d15;
+  color: rgba(255, 244, 240, 0.9);
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  width: 100%;
+  max-width: 880px;
+  margin: 0 auto;
+  padding: 56px 20px 140px;
+}
+
+/* ── Hero ── */
+.hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    'text orb'
+    'filters filters';
+  column-gap: 24px;
+  row-gap: 20px;
+  align-items: center;
+}
+
+.heroOrbSlot {
+  grid-area: orb;
+  width: 180px;
+  height: 180px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  justify-self: end;
+}
+
+.heroText {
+  grid-area: text;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+}
+
+.filtersRow {
+  grid-area: filters;
+  display: flex;
+}
+
+@media (max-width: 520px) {
+  .heroOrbSlot {
+    width: 132px;
+    height: 132px;
+  }
+}
+
+.eyebrow {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.55);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(36px, 6vw, 56px);
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+  color: rgba(255, 244, 240, 0.96);
+}
+
+.count {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.5);
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+}
+
+/* ── Filter chips ── */
+.filters {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 16px;
+  padding: 4px;
+  border-radius: var(--rd-radius-pill, 999px);
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  align-self: flex-start;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.chip {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  padding: 7px 14px;
+  border-radius: var(--rd-radius-pill, 999px);
+  color: rgba(255, 244, 240, 0.55);
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition:
+    color var(--rd-duration-default, 200ms) var(--ease-smooth, ease),
+    background var(--rd-duration-default, 200ms) var(--ease-smooth, ease);
+}
+
+.chip:hover {
+  color: rgba(255, 244, 240, 0.85);
+}
+
+.chip:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+}
+
+.chipActive {
+  background: linear-gradient(135deg, #8b5cf6, #ec4899);
+  color: #fff;
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.32);
+}
+
+.chipActive:hover {
+  color: #fff;
+}
+
+/* ── Empty state ── */
+.empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 40px 0 12px;
+  text-align: center;
+}
+
+.emptyTitle {
+  margin: 0;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 22px;
+  color: rgba(255, 244, 240, 0.9);
+}
+
+.emptySubtitle {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.55);
+  font-family: var(--font-body);
+  font-size: 14px;
+  line-height: 1.55;
+}
+
+/* ── Dock slot ── */
+.dockSlot {
+  position: fixed;
+  left: 50%;
+  bottom: 22px;
+  transform: translateX(-50%);
+  z-index: 20;
+}
+
+/* ── Light theme ── */
+:global(.redesign-root[data-theme='light']) .page,
+:global(:root[data-redesign-theme='light']) .page {
+  background: radial-gradient(
+      ellipse at 50% -10%,
+      rgba(139, 92, 246, 0.12) 0%,
+      transparent 55%
+    ),
+    radial-gradient(
+      ellipse at 50% 110%,
+      rgba(236, 72, 153, 0.08) 0%,
+      transparent 55%
+    ),
+    #f7f4fa;
+  color: rgba(36, 22, 49, 0.92);
+}
+
+:global(.redesign-root[data-theme='light']) .eyebrow,
+:global(:root[data-redesign-theme='light']) .eyebrow {
+  color: rgba(82, 63, 92, 0.7);
+}
+
+:global(.redesign-root[data-theme='light']) .title,
+:global(:root[data-redesign-theme='light']) .title {
+  color: rgba(36, 22, 49, 0.95);
+}
+
+:global(.redesign-root[data-theme='light']) .count,
+:global(:root[data-redesign-theme='light']) .count {
+  color: rgba(82, 63, 92, 0.66);
+}
+
+:global(.redesign-root[data-theme='light']) .filters,
+:global(:root[data-redesign-theme='light']) .filters {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(91, 33, 182, 0.1);
+}
+
+:global(.redesign-root[data-theme='light']) .chip,
+:global(:root[data-redesign-theme='light']) .chip {
+  color: rgba(82, 63, 92, 0.72);
+}
+
+:global(.redesign-root[data-theme='light']) .chip:hover,
+:global(:root[data-redesign-theme='light']) .chip:hover {
+  color: rgba(36, 22, 49, 0.95);
+}
+
+/* Light-theme override must keep active chip white-on-gradient. */
+:global(.redesign-root[data-theme='light']) .chipActive,
+:global(:root[data-redesign-theme='light']) .chipActive,
+:global(.redesign-root[data-theme='light']) .chipActive:hover,
+:global(:root[data-redesign-theme='light']) .chipActive:hover {
+  color: #fff;
+}
+
+:global(.redesign-root[data-theme='light']) .emptyTitle,
+:global(:root[data-redesign-theme='light']) .emptyTitle {
+  color: rgba(36, 22, 49, 0.92);
+}
+
+:global(.redesign-root[data-theme='light']) .emptySubtitle,
+:global(:root[data-redesign-theme='light']) .emptySubtitle {
+  color: rgba(82, 63, 92, 0.7);
+}
+
+@media (max-width: 520px) {
+  .shell {
+    padding: 36px 16px 130px;
+    gap: 22px;
+  }
+  .title {
+    font-size: clamp(30px, 8vw, 40px);
+  }
+  .filters {
+    margin-top: 12px;
+  }
+  .chip {
+    padding: 6px 11px;
+    font-size: 11.5px;
+  }
+}

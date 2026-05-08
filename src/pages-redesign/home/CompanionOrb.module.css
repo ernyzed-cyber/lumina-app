@@ -1,0 +1,413 @@
+.stage {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 100%;
+  padding-block: clamp(20px, 5vh, 60px);
+}
+
+/* Mini variant — compact presence bead next to the Memories hero. */
+.stageMini {
+  width: auto;
+  padding-block: 0;
+}
+
+.orbWrapMini {
+  width: 180px;
+  min-width: 180px;
+  max-width: 180px;
+  height: 180px;
+  min-height: 180px;
+  max-height: 180px;
+  aspect-ratio: 1 / 1;
+  flex: 0 0 180px;
+}
+
+.orbWrapMini .halo {
+  inset: -16%;
+  filter: blur(28px);
+}
+
+@media (max-width: 520px) {
+  .orbWrapMini {
+    width: 132px;
+    min-width: 132px;
+    max-width: 132px;
+    height: 132px;
+    min-height: 132px;
+    max-height: 132px;
+    flex: 0 0 132px;
+  }
+  .orbWrapMini .halo {
+    filter: blur(20px);
+  }
+}
+
+.orbWrap {
+  --orb-tint: rgba(236, 200, 220, 0.35);
+  --orb-core: rgba(236, 72, 153, 0.55);
+  --orb-glow: rgba(236, 72, 153, 0.32);
+  --orb-rim-warm: rgba(255, 180, 220, 0.7);
+  --orb-rim-cool: rgba(140, 200, 255, 0.6);
+  --orb-ring: rgba(236, 200, 255, 0.35);
+
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: clamp(260px, 56vw, 400px);
+  aspect-ratio: 1;
+}
+
+/* ─── Beam from below ─── */
+.beam {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  z-index: 0;
+  width: 130%;
+  height: 200%;
+  pointer-events: none;
+  transform: translate(-50%, -8%);
+  background: radial-gradient(
+    ellipse 38% 48% at 50% 28%,
+    var(--orb-glow),
+    transparent 70%
+  );
+  filter: blur(28px);
+  opacity: 0.85;
+  mix-blend-mode: screen;
+}
+
+/* ─── Orbital rings ─── */
+.ring {
+  position: absolute;
+  inset: -8%;
+  z-index: 1;
+  border-radius: 50%;
+  border: 1px solid var(--orb-ring);
+  pointer-events: none;
+  box-shadow:
+    0 0 18px var(--orb-glow),
+    inset 0 0 18px rgba(255, 255, 255, 0.08);
+  will-change: transform, opacity;
+}
+
+.ringA {
+  inset: -10%;
+  transform: rotate3d(1, 0.6, 0, 72deg);
+  animation: ringSpinA 28s linear infinite;
+  opacity: 0.9;
+}
+
+.ringB {
+  inset: -18%;
+  border-width: 1px;
+  opacity: 0.55;
+  transform: rotate3d(0.6, 1, 0.2, 64deg);
+  animation: ringSpinB 44s linear infinite reverse;
+}
+
+/* ─── Halo ─── */
+.halo {
+  position: absolute;
+  inset: -22%;
+  z-index: 1;
+  pointer-events: none;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 52%, var(--orb-glow), transparent 62%);
+  filter: blur(52px);
+  mix-blend-mode: screen;
+  will-change: transform, opacity;
+}
+
+/* ─── Orb button (glass bubble) ─── */
+.orbButton {
+  position: relative;
+  z-index: 2;
+  display: grid;
+  place-items: center;
+  width: 78%;
+  height: 78%;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  outline: none;
+  -webkit-tap-highlight-color: transparent;
+  will-change: transform;
+  /* Outer drop shadow — sphere "sits" in space */
+  filter:
+    drop-shadow(0 24px 48px rgba(0, 0, 0, 0.5))
+    drop-shadow(0 0 60px var(--orb-glow));
+}
+
+.orbButton:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.42);
+  outline-offset: 14px;
+}
+
+/* Bubble: a thin shell. Background is mostly transparent tint
+   so stars/nebula bleed through. */
+.bubble {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 50%, var(--orb-tint), rgba(255, 255, 255, 0.04) 60%, rgba(0, 0, 0, 0.18) 100%);
+  /* Thin glass wall */
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.22),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+/* All layers fill the bubble */
+.refraction,
+.core,
+.innerGlow,
+.rim,
+.specularTop,
+.specularBottom {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+/* Chromatic edge refraction — soap-bubble iridescence.
+   3 thin colored rims offset slightly. */
+.refraction {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 86%, var(--orb-rim-warm) 92%, transparent 96%),
+    radial-gradient(circle at 50% 50%, transparent 88%, var(--orb-rim-cool) 94%, transparent 98%),
+    radial-gradient(circle at 50% 50%, transparent 90%, rgba(255, 255, 255, 0.6) 95%, transparent 100%);
+  mix-blend-mode: screen;
+  opacity: 0.85;
+}
+
+/* Mood core — soft glow at center. The "presence". */
+.core {
+  background: radial-gradient(
+    circle at 50% 55%,
+    var(--orb-core),
+    rgba(0, 0, 0, 0) 55%
+  );
+  filter: blur(8px);
+  opacity: 0.9;
+  mix-blend-mode: screen;
+}
+
+/* Inner glow — subtle warmth radiating from inside */
+.innerGlow {
+  background:
+    radial-gradient(ellipse 60% 80% at 50% 100%, var(--orb-rim-warm), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 0%, rgba(255, 255, 255, 0.18), transparent 60%);
+  mix-blend-mode: screen;
+  opacity: 0.55;
+}
+
+/* Rim-light around the perimeter — bubble edge */
+.rim {
+  background:
+    radial-gradient(circle at 50% 50%, transparent 78%, rgba(255, 255, 255, 0.18) 88%, transparent 100%);
+  mix-blend-mode: screen;
+}
+
+/* Bottom translucent reflection — bounce light from below */
+.specularBottom {
+  background: radial-gradient(
+    ellipse 45% 22% at 50% 88%,
+    rgba(255, 255, 255, 0.45),
+    rgba(255, 255, 255, 0) 70%
+  );
+  opacity: 0.7;
+  mix-blend-mode: screen;
+}
+
+/* Top specular — bright highlight + tiny pinpoint */
+.specularTop {
+  background:
+    radial-gradient(ellipse 38% 24% at 34% 22%, rgba(255, 255, 255, 0.7), rgba(255, 255, 255, 0) 60%),
+    radial-gradient(circle at 30% 18%, rgba(255, 255, 255, 0.95), transparent 6%);
+  opacity: 0.85;
+}
+
+/* ─── Thought (long-press) ─── */
+.thought {
+  position: absolute;
+  top: clamp(8px, 4vh, 36px);
+  left: 50%;
+  z-index: 5;
+  width: min(420px, 84vw);
+  margin: 0;
+  padding: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-family: var(--font-display);
+  font-size: clamp(16px, 2vw, 19px);
+  font-style: italic;
+  font-weight: 400;
+  line-height: 1.55;
+  text-align: center;
+  letter-spacing: 0.005em;
+  transform: translateX(-50%);
+  pointer-events: none;
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Listening ─── */
+.listening .beam {
+  opacity: 1;
+}
+
+.listening .core {
+  opacity: 1;
+  filter: blur(6px);
+}
+
+.listening .ringA,
+.listening .ringB {
+  border-color: rgba(255, 220, 240, 0.55);
+}
+
+/* ─── Mood palettes ─── */
+.moodThoughtful {
+  --orb-tint: rgba(165, 145, 220, 0.3);
+  --orb-core: rgba(139, 92, 246, 0.55);
+  --orb-glow: rgba(139, 92, 246, 0.32);
+  --orb-rim-warm: rgba(196, 181, 253, 0.7);
+  --orb-rim-cool: rgba(140, 200, 255, 0.6);
+  --orb-ring: rgba(196, 181, 253, 0.4);
+}
+
+.moodWarm {
+  --orb-tint: rgba(244, 180, 160, 0.32);
+  --orb-core: rgba(244, 114, 134, 0.55);
+  --orb-glow: rgba(244, 114, 134, 0.32);
+  --orb-rim-warm: rgba(255, 200, 180, 0.75);
+  --orb-rim-cool: rgba(160, 200, 240, 0.55);
+  --orb-ring: rgba(252, 211, 195, 0.42);
+}
+
+.moodPlayful {
+  --orb-tint: rgba(244, 160, 200, 0.32);
+  --orb-core: rgba(236, 72, 153, 0.6);
+  --orb-glow: rgba(236, 72, 153, 0.34);
+  --orb-rim-warm: rgba(249, 168, 212, 0.75);
+  --orb-rim-cool: rgba(140, 200, 255, 0.6);
+  --orb-ring: rgba(249, 168, 212, 0.45);
+}
+
+.moodMissingYou {
+  --orb-tint: rgba(140, 160, 220, 0.32);
+  --orb-core: rgba(99, 124, 220, 0.55);
+  --orb-glow: rgba(99, 124, 220, 0.3);
+  --orb-rim-warm: rgba(196, 181, 253, 0.65);
+  --orb-rim-cool: rgba(140, 200, 255, 0.7);
+  --orb-ring: rgba(165, 180, 252, 0.4);
+}
+
+.moodQuiet {
+  --orb-tint: rgba(160, 170, 190, 0.28);
+  --orb-core: rgba(148, 163, 184, 0.45);
+  --orb-glow: rgba(148, 163, 184, 0.26);
+  --orb-rim-warm: rgba(220, 220, 230, 0.6);
+  --orb-rim-cool: rgba(180, 200, 220, 0.55);
+  --orb-ring: rgba(203, 213, 225, 0.34);
+}
+
+.moodTender {
+  --orb-tint: rgba(244, 180, 200, 0.32);
+  --orb-core: rgba(236, 165, 198, 0.55);
+  --orb-glow: rgba(236, 165, 198, 0.32);
+  --orb-rim-warm: rgba(249, 200, 220, 0.72);
+  --orb-rim-cool: rgba(196, 181, 253, 0.55);
+  --orb-ring: rgba(249, 200, 220, 0.42);
+}
+
+.moodCurious {
+  --orb-tint: rgba(140, 200, 220, 0.32);
+  --orb-core: rgba(110, 200, 220, 0.55);
+  --orb-glow: rgba(110, 200, 220, 0.3);
+  --orb-rim-warm: rgba(196, 181, 253, 0.6);
+  --orb-rim-cool: rgba(140, 220, 240, 0.7);
+  --orb-ring: rgba(165, 222, 232, 0.4);
+}
+
+/* ─── Light theme ─── */
+:global(.redesign-root[data-theme='light']) .bubble,
+:global(:root[data-redesign-theme='light']) .bubble {
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.6),
+    inset 0 1px 1px rgba(255, 255, 255, 0.7);
+}
+
+:global(.redesign-root[data-theme='light']) .orbButton,
+:global(:root[data-redesign-theme='light']) .orbButton {
+  filter:
+    drop-shadow(0 24px 48px rgba(120, 80, 120, 0.28))
+    drop-shadow(0 0 60px var(--orb-glow));
+}
+
+:global(.redesign-root[data-theme='light']) .ring,
+:global(:root[data-redesign-theme='light']) .ring {
+  border-color: rgba(139, 92, 246, 0.28);
+  box-shadow:
+    0 0 14px rgba(236, 72, 153, 0.18),
+    inset 0 0 14px rgba(255, 255, 255, 0.4);
+}
+
+:global(.redesign-root[data-theme='light']) .thought,
+:global(:root[data-redesign-theme='light']) .thought {
+  color: rgba(54, 38, 67, 0.74);
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.6);
+}
+
+:global(.redesign-root[data-theme='light']) .orbButton:focus-visible,
+:global(:root[data-redesign-theme='light']) .orbButton:focus-visible {
+  outline-color: rgba(91, 33, 182, 0.42);
+}
+
+/* ─── Keyframes ─── */
+@keyframes ringSpinA {
+  from { transform: rotate3d(1, 0.6, 0, 72deg) rotateZ(0deg); }
+  to { transform: rotate3d(1, 0.6, 0, 72deg) rotateZ(360deg); }
+}
+
+@keyframes ringSpinB {
+  from { transform: rotate3d(0.6, 1, 0.2, 64deg) rotateZ(0deg); }
+  to { transform: rotate3d(0.6, 1, 0.2, 64deg) rotateZ(360deg); }
+}
+
+@media (max-width: 520px) {
+  .orbWrap {
+    width: min(78vw, 320px);
+  }
+  /* Cheaper compositing: smaller blurs, drop backdrop-filter
+     (bubble alpha is enough for stars to bleed through). */
+  .bubble {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .halo {
+    filter: blur(28px);
+  }
+  .beam {
+    filter: blur(18px);
+  }
+  .core {
+    filter: blur(5px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ringA,
+  .ringB {
+    animation: none;
+  }
+}

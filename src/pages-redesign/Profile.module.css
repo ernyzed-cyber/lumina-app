@@ -1,0 +1,708 @@
+.page {
+  position: relative;
+  flex: 1;
+  min-height: 100%;
+  overflow: auto;
+  isolation: isolate;
+  color: rgba(248, 244, 255, 0.92);
+  background: #0f0a1a;
+}
+
+.page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 50% -12%, rgba(139, 92, 246, 0.18) 0%, transparent 56%),
+    radial-gradient(ellipse at 70% 120%, rgba(236, 72, 153, 0.14) 0%, transparent 58%),
+    #0f0a1a;
+}
+
+.starFieldLayer {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.shell {
+  position: relative;
+  z-index: 1;
+  width: min(760px, calc(100vw - 20px));
+  margin: 0 auto;
+  padding: 18px 0 140px;
+}
+
+.hero {
+  position: relative;
+  border-radius: 28px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(18, 13, 32, 0.58);
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.42),
+    0 0 0 1px rgba(139, 92, 246, 0.12) inset;
+  backdrop-filter: blur(24px) saturate(155%);
+  -webkit-backdrop-filter: blur(24px) saturate(155%);
+  padding: 24px 20px 20px;
+  overflow: hidden;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 50% -8%, rgba(139, 92, 246, 0.24) 0%, transparent 48%),
+    radial-gradient(circle at 92% 30%, rgba(236, 72, 153, 0.15) 0%, transparent 42%);
+}
+
+.heroStack {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  justify-items: center;
+  row-gap: 12px;
+  text-align: center;
+}
+
+.orbWrap {
+  position: relative;
+  width: 148px;
+  height: 148px;
+}
+
+.orbRing {
+  position: absolute;
+  inset: -2px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.92) 0%, rgba(236, 72, 153, 0.86) 100%);
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.08) inset,
+    0 12px 28px rgba(139, 92, 246, 0.32);
+}
+
+.orb {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: 999px;
+  overflow: hidden;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.15) 0%, rgba(255, 255, 255, 0.04) 100%),
+    radial-gradient(circle at 30% 20%, rgba(236, 72, 153, 0.25) 0%, transparent 42%),
+    radial-gradient(circle at 70% 80%, rgba(139, 92, 246, 0.34) 0%, transparent 48%),
+    rgba(255, 255, 255, 0.06);
+}
+
+.orbImg {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center center;
+}
+
+.orbFallback {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: rgba(248, 244, 255, 0.75);
+}
+
+.cameraBtn {
+  position: absolute;
+  right: -2px;
+  bottom: -2px;
+  width: 38px;
+  height: 38px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  background: rgba(25, 18, 43, 0.74);
+  color: rgba(248, 244, 255, 0.92);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: default;
+  box-shadow: 0 10px 20px rgba(0, 0, 0, 0.32);
+}
+
+.nameRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.name {
+  margin: 0;
+  font-size: 23px;
+  letter-spacing: -0.02em;
+  line-height: 1.15;
+  color: rgba(248, 244, 255, 0.98);
+}
+
+.nameEdit {
+  border: none;
+  background: transparent;
+  color: rgba(248, 244, 255, 0.78);
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.email {
+  margin: 0;
+  font-size: 13px;
+  color: rgba(157, 143, 191, 0.96);
+}
+
+.progressWrap {
+  width: min(360px, 100%);
+  display: grid;
+  row-gap: 8px;
+}
+
+.progressTrack {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.progressFill {
+  height: 100%;
+  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
+  box-shadow: 0 0 18px rgba(139, 92, 246, 0.42);
+}
+
+.progressLabel {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+  color: rgba(227, 215, 255, 0.9);
+}
+
+.toggleBar {
+  margin-top: 14px;
+  display: inline-flex;
+  border: 1px solid rgba(139, 92, 246, 0.24);
+  border-radius: 999px;
+  background: rgba(21, 14, 34, 0.64);
+  overflow: hidden;
+}
+
+.toggleBtn {
+  border: none;
+  background: transparent;
+  color: rgba(248, 244, 255, 0.72);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 8px 14px;
+  cursor: pointer;
+}
+
+.toggleBtnActive {
+  color: rgba(255, 255, 255, 0.98);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.34) 0%, rgba(236, 72, 153, 0.28) 100%);
+}
+
+.sections {
+  margin-top: 16px;
+  display: grid;
+  gap: 14px;
+}
+
+.card {
+  border-radius: 20px;
+  padding: 16px 16px 10px;
+  border: 1px solid rgba(139, 92, 246, 0.14);
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(16px) saturate(150%);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.26);
+}
+
+.cardTitle {
+  margin: 0 0 10px;
+  font-size: 11px;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  font-weight: 700;
+  color: rgba(196, 181, 253, 0.95);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.titleDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+}
+
+.fieldRow {
+  width: 100%;
+  border: none;
+  border-radius: 12px;
+  background: transparent;
+  color: inherit;
+  display: grid;
+  grid-template-columns: 24px minmax(90px, 1fr) minmax(80px, 1fr) 20px;
+  align-items: center;
+  column-gap: 8px;
+  min-height: 44px;
+  padding: 6px 8px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.fieldRow + .fieldRow {
+  margin-top: 1px;
+}
+
+.fieldRow:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+
+.fieldIcon {
+  color: rgba(196, 181, 253, 0.9);
+  display: inline-flex;
+}
+
+.fieldLabel {
+  font-size: 14px;
+  color: rgba(243, 236, 255, 0.92);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fieldValue {
+  font-size: 13px;
+  color: rgba(210, 196, 236, 0.88);
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.fieldPlaceholder {
+  color: rgba(157, 143, 191, 0.72);
+}
+
+.fieldChevron {
+  color: rgba(157, 143, 191, 0.84);
+}
+
+.stickyBar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  margin: 0 auto;
+  width: min(760px, 100vw);
+  border-top: 1px solid rgba(139, 92, 246, 0.2);
+  background: rgba(17, 12, 29, 0.86);
+  backdrop-filter: blur(18px) saturate(150%);
+  -webkit-backdrop-filter: blur(18px) saturate(150%);
+  padding: 10px 12px calc(10px + env(safe-area-inset-bottom));
+  z-index: 30;
+}
+
+.stickyRow {
+  display: grid;
+  width: min(440px, 100%);
+  margin: 0 auto;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btnGhost,
+.btnPrimary {
+  height: 44px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.btnGhost {
+  color: rgba(243, 236, 255, 0.9);
+  border-color: rgba(139, 92, 246, 0.22);
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.btnPrimary {
+  color: #fff;
+  border: none;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  box-shadow: 0 10px 22px rgba(139, 92, 246, 0.32);
+}
+
+.sheetOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.62);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  z-index: 50;
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 10px;
+}
+
+.sheet {
+  width: min(760px, 100%);
+  max-height: 70vh;
+  overflow: auto;
+  border-radius: 28px 28px 0 0;
+  border: 1px solid rgba(139, 92, 246, 0.24);
+  background: rgba(19, 13, 33, 0.95);
+  box-shadow: 0 -16px 38px rgba(0, 0, 0, 0.46);
+  padding: 10px 14px 14px;
+}
+
+.sheetHandle {
+  width: 32px;
+  height: 4px;
+  border-radius: 999px;
+  margin: 0 auto 12px;
+  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
+}
+
+.sheetHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.sheetTitle {
+  margin: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  color: rgba(248, 244, 255, 0.95);
+}
+
+.sheetClose {
+  width: 32px;
+  height: 32px;
+  border-radius: 10px;
+  border: 1px solid rgba(139, 92, 246, 0.24);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(248, 244, 255, 0.88);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.sheetBody {
+  margin-top: 12px;
+}
+
+.input,
+.textarea {
+  width: 100%;
+  border-radius: 14px;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(248, 244, 255, 0.95);
+  font-size: 15px;
+  line-height: 1.45;
+  outline: none;
+}
+
+.input {
+  height: 48px;
+  padding: 0 12px;
+}
+
+.textarea {
+  resize: vertical;
+  min-height: 120px;
+  padding: 10px 12px;
+}
+
+.counter {
+  margin-top: 6px;
+  text-align: right;
+  font-size: 12px;
+  color: rgba(157, 143, 191, 0.82);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip {
+  border: 1px solid rgba(139, 92, 246, 0.24);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  color: rgba(240, 232, 255, 0.92);
+  padding: 8px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.chipActive {
+  border-color: rgba(236, 72, 153, 0.64);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.28) 0%, rgba(236, 72, 153, 0.25) 100%);
+}
+
+.options {
+  display: grid;
+  gap: 6px;
+}
+
+.option {
+  width: 100%;
+  min-height: 42px;
+  border: 1px solid rgba(139, 92, 246, 0.2);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.03);
+  color: rgba(248, 244, 255, 0.9);
+  padding: 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+}
+
+.optionActive {
+  border-color: rgba(236, 72, 153, 0.58);
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22) 0%, rgba(236, 72, 153, 0.2) 100%);
+}
+
+.rangeRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.sheetFooter {
+  margin-top: 14px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.btnGhost:focus-visible,
+.btnPrimary:focus-visible,
+.fieldRow:focus-visible,
+.nameEdit:focus-visible,
+.toggleBtn:focus-visible,
+.sheetClose:focus-visible,
+.chip:focus-visible,
+.option:focus-visible,
+.input:focus-visible,
+.textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.55);
+}
+
+:global(.redesign-root[data-theme='light']) .page,
+:global(:root[data-redesign-theme='light']) .page {
+  color: rgba(30, 27, 46, 0.95);
+  background: #f5f3ff;
+}
+
+:global(.redesign-root[data-theme='light']) .page::before,
+:global(:root[data-redesign-theme='light']) .page::before {
+  background:
+    radial-gradient(ellipse at 50% -10%, rgba(139, 92, 246, 0.2) 0%, transparent 56%),
+    radial-gradient(ellipse at 70% 120%, rgba(236, 72, 153, 0.16) 0%, transparent 58%),
+    #f5f3ff;
+}
+
+:global(.redesign-root[data-theme='light']) .hero,
+:global(:root[data-redesign-theme='light']) .hero {
+  border-color: rgba(139, 92, 246, 0.2);
+  background: rgba(255, 255, 255, 0.78);
+  box-shadow:
+    0 16px 38px rgba(91, 33, 182, 0.14),
+    0 0 0 1px rgba(255, 255, 255, 0.7) inset;
+}
+
+:global(.redesign-root[data-theme='light']) .name,
+:global(:root[data-redesign-theme='light']) .name,
+:global(.redesign-root[data-theme='light']) .fieldLabel,
+:global(:root[data-redesign-theme='light']) .fieldLabel,
+:global(.redesign-root[data-theme='light']) .sheetTitle,
+:global(:root[data-redesign-theme='light']) .sheetTitle,
+:global(.redesign-root[data-theme='light']) .input,
+:global(:root[data-redesign-theme='light']) .input,
+:global(.redesign-root[data-theme='light']) .textarea,
+:global(:root[data-redesign-theme='light']) .textarea,
+:global(.redesign-root[data-theme='light']) .option,
+:global(:root[data-redesign-theme='light']) .option {
+  color: rgba(30, 27, 46, 0.95);
+}
+
+:global(.redesign-root[data-theme='light']) .email,
+:global(:root[data-redesign-theme='light']) .email,
+:global(.redesign-root[data-theme='light']) .progressLabel,
+:global(:root[data-redesign-theme='light']) .progressLabel,
+:global(.redesign-root[data-theme='light']) .fieldValue,
+:global(:root[data-redesign-theme='light']) .fieldValue,
+:global(.redesign-root[data-theme='light']) .counter,
+:global(:root[data-redesign-theme='light']) .counter {
+  color: rgba(83, 70, 112, 0.95);
+}
+
+:global(.redesign-root[data-theme='light']) .cardTitle,
+:global(:root[data-redesign-theme='light']) .cardTitle {
+  color: rgba(99, 81, 136, 0.95);
+}
+
+:global(.redesign-root[data-theme='light']) .fieldIcon,
+:global(:root[data-redesign-theme='light']) .fieldIcon {
+  color: rgba(120, 91, 193, 0.92);
+}
+
+:global(.redesign-root[data-theme='light']) .fieldChevron,
+:global(:root[data-redesign-theme='light']) .fieldChevron,
+:global(.redesign-root[data-theme='light']) .fieldPlaceholder,
+:global(:root[data-redesign-theme='light']) .fieldPlaceholder {
+  color: rgba(111, 94, 146, 0.9);
+}
+
+:global(.redesign-root[data-theme='light']) .card,
+:global(:root[data-redesign-theme='light']) .card {
+  border-color: rgba(139, 92, 246, 0.18);
+  background: rgba(91, 33, 182, 0.05);
+}
+
+:global(.redesign-root[data-theme='light']) .fieldRow:hover,
+:global(:root[data-redesign-theme='light']) .fieldRow:hover {
+  background: rgba(139, 92, 246, 0.09);
+}
+
+:global(.redesign-root[data-theme='light']) .stickyBar,
+:global(:root[data-redesign-theme='light']) .stickyBar {
+  border-top-color: rgba(139, 92, 246, 0.2);
+  background: rgba(245, 243, 255, 0.9);
+}
+
+:global(.redesign-root[data-theme='light']) .btnGhost,
+:global(:root[data-redesign-theme='light']) .btnGhost {
+  color: rgba(30, 27, 46, 0.94);
+  border-color: rgba(139, 92, 246, 0.24);
+  background: rgba(255, 255, 255, 0.8);
+}
+
+:global(.redesign-root[data-theme='light']) .sheet,
+:global(:root[data-redesign-theme='light']) .sheet {
+  border-color: rgba(139, 92, 246, 0.22);
+  background: rgba(250, 248, 255, 0.96);
+  box-shadow: 0 -16px 38px rgba(91, 33, 182, 0.16);
+}
+
+:global(.redesign-root[data-theme='light']) .input,
+:global(:root[data-redesign-theme='light']) .input,
+:global(.redesign-root[data-theme='light']) .textarea,
+:global(:root[data-redesign-theme='light']) .textarea,
+:global(.redesign-root[data-theme='light']) .chip,
+:global(:root[data-redesign-theme='light']) .chip,
+:global(.redesign-root[data-theme='light']) .option,
+:global(:root[data-redesign-theme='light']) .option,
+:global(.redesign-root[data-theme='light']) .sheetClose,
+:global(:root[data-redesign-theme='light']) .sheetClose,
+:global(.redesign-root[data-theme='light']) .toggleBar,
+:global(:root[data-redesign-theme='light']) .toggleBar {
+  border-color: rgba(139, 92, 246, 0.24);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+:global(.redesign-root[data-theme='light']) .toggleBtn,
+:global(:root[data-redesign-theme='light']) .toggleBtn {
+  color: rgba(69, 58, 93, 0.9);
+}
+
+:global(.redesign-root[data-theme='light']) .cameraBtn,
+:global(:root[data-redesign-theme='light']) .cameraBtn {
+  border-color: rgba(139, 92, 246, 0.34);
+  background: rgba(244, 236, 255, 0.92);
+  color: rgba(86, 54, 151, 0.98);
+  box-shadow: 0 8px 18px rgba(91, 33, 182, 0.2);
+}
+
+:global(.redesign-root[data-theme='light']) .toggleBtnActive,
+:global(:root[data-redesign-theme='light']) .toggleBtnActive {
+  color: #fff;
+}
+
+:global(.redesign-root[data-theme='light']) .btnGhost:focus-visible,
+:global(:root[data-redesign-theme='light']) .btnGhost:focus-visible,
+:global(.redesign-root[data-theme='light']) .btnPrimary:focus-visible,
+:global(:root[data-redesign-theme='light']) .btnPrimary:focus-visible,
+:global(.redesign-root[data-theme='light']) .fieldRow:focus-visible,
+:global(:root[data-redesign-theme='light']) .fieldRow:focus-visible,
+:global(.redesign-root[data-theme='light']) .nameEdit:focus-visible,
+:global(:root[data-redesign-theme='light']) .nameEdit:focus-visible,
+:global(.redesign-root[data-theme='light']) .toggleBtn:focus-visible,
+:global(:root[data-redesign-theme='light']) .toggleBtn:focus-visible,
+:global(.redesign-root[data-theme='light']) .sheetClose:focus-visible,
+:global(:root[data-redesign-theme='light']) .sheetClose:focus-visible,
+:global(.redesign-root[data-theme='light']) .chip:focus-visible,
+:global(:root[data-redesign-theme='light']) .chip:focus-visible,
+:global(.redesign-root[data-theme='light']) .option:focus-visible,
+:global(:root[data-redesign-theme='light']) .option:focus-visible,
+:global(.redesign-root[data-theme='light']) .input:focus-visible,
+:global(:root[data-redesign-theme='light']) .input:focus-visible,
+:global(.redesign-root[data-theme='light']) .textarea:focus-visible,
+:global(:root[data-redesign-theme='light']) .textarea:focus-visible {
+  box-shadow: 0 0 0 2px rgba(91, 33, 182, 0.5);
+}
+
+@media (max-width: 640px) {
+  .shell {
+    width: calc(100vw - 12px);
+    padding-top: 10px;
+  }
+
+  .hero {
+    border-radius: 24px;
+    padding: 20px 14px 16px;
+  }
+
+  .orbWrap {
+    width: 136px;
+    height: 136px;
+  }
+
+  .name {
+    font-size: 21px;
+  }
+
+  .card {
+    border-radius: 18px;
+    padding: 14px 12px 10px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .progressFill,
+  .sheet,
+  .stickyBar {
+    transition: none !important;
+    animation: none !important;
+  }
+}

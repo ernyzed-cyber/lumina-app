@@ -1,0 +1,205 @@
+/**
+ * BrandSide — living particle-constellation panel.
+ *
+ * Z-order:
+ *   z=0 — deep gradient backdrop (.root background)
+ *   z=1 — ParticleField canvas
+ *   z=2 — glow1 / glow2 (soft halo blobs)
+ *   z=3 — vignette
+ *   z=4 — logo / content
+ *
+ * Brand text всегда белый (это identity, не темизируется).
+ */
+
+.root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  z-index: 0;
+  overflow: hidden;
+  /* Deep purple backdrop — частицы светятся на тёмном */
+  background:
+    radial-gradient(ellipse at 30% 20%, #2a0e3e 0%, #1a0828 50%, #0e0620 100%),
+    linear-gradient(135deg, #0e0826 0%, #1a0a35 50%, #2a0e3e 100%);
+}
+
+/* ─────────────────────────────────────────────
+   Soft glow blobs — magic feel поверх частиц
+   ───────────────────────────────────────────── */
+.glow1,
+.glow2 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.glow1 {
+  width: 420px;
+  height: 420px;
+  top: -120px;
+  left: -100px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.45) 0%, transparent 70%);
+  animation: float1 18s ease-in-out infinite;
+}
+.glow2 {
+  width: 360px;
+  height: 360px;
+  bottom: -100px;
+  right: -120px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.45) 0%, transparent 70%);
+  animation: float2 22s ease-in-out infinite;
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, 30px) scale(1.08); }
+  66% { transform: translate(-20px, 50px) scale(0.95); }
+}
+@keyframes float2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-35px, -40px) scale(0.92); }
+  66% { transform: translate(25px, -20px) scale(1.1); }
+}
+
+/* ─────────────────────────────────────────────
+   Vignette — soft radial darken по краям
+   ───────────────────────────────────────────── */
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at center, transparent 50%, rgba(8, 4, 18, 0.45) 100%);
+}
+
+/* ─────────────────────────────────────────────
+   Content (logo + title + progress)
+   ───────────────────────────────────────────── */
+.logo {
+  font-family: var(--rd-font-display, 'Playfair Display', serif);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+  z-index: 4;
+  position: relative;
+  text-shadow: 0 2px 16px rgba(139, 92, 246, 0.4);
+}
+
+.content {
+  margin-top: auto;
+  z-index: 4;
+  position: relative;
+}
+
+.title {
+  font-family: var(--rd-font-display, 'Playfair Display', serif);
+  font-size: clamp(28px, 5vw, 46px);
+  font-weight: 500;
+  line-height: 1.12;
+  letter-spacing: -0.02em;
+  color: #ffffff;
+  margin: 0 0 16px;
+  text-shadow: 0 4px 24px rgba(8, 4, 18, 0.6), 0 0 40px rgba(139, 92, 246, 0.25);
+  animation: titleFadeIn 800ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+
+.subtitle {
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 16px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.86);
+  margin: 0;
+  max-width: 36ch;
+  text-shadow: 0 2px 12px rgba(8, 4, 18, 0.5);
+  animation: titleFadeIn 800ms cubic-bezier(0.2, 0.8, 0.3, 1) 120ms both;
+}
+
+@keyframes titleFadeIn {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Progress (onboarding) */
+.progress {
+  margin-top: 32px;
+}
+.progressLabel {
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.78);
+  margin-bottom: 12px;
+  font-weight: 500;
+  text-shadow: 0 1px 8px rgba(8, 4, 18, 0.5);
+}
+.progressTrack {
+  display: flex;
+  gap: 8px;
+}
+.progressDot {
+  flex: 1;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.18);
+  transition: background 320ms cubic-bezier(0.2, 0.8, 0.3, 1),
+              box-shadow 400ms cubic-bezier(0.2, 0.8, 0.3, 1),
+              transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.progressDot[data-active='true'] {
+  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
+  box-shadow: 0 0 16px rgba(236, 72, 153, 0.55), 0 0 8px rgba(139, 92, 246, 0.4);
+  transform: scaleY(1.3);
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .glow1,
+  .glow2,
+  .progressDot,
+  .title,
+  .subtitle {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Mobile (<960px): hero-blur 200-240px
+   ───────────────────────────────────────────── */
+@media (max-width: 959px) {
+  .root {
+    min-height: 200px;
+    max-height: 240px;
+  }
+  .logo {
+    font-size: 22px;
+  }
+  .title {
+    font-size: clamp(20px, 5vw, 28px);
+    margin-bottom: 8px;
+  }
+  .subtitle {
+    font-size: 14px;
+  }
+  .content {
+    margin-top: 12px;
+  }
+  .glow1 {
+    width: 240px;
+    height: 240px;
+  }
+  .glow2 {
+    width: 200px;
+    height: 200px;
+  }
+  .progress {
+    margin-top: 12px;
+  }
+}

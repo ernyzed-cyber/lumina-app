@@ -406,7 +406,8 @@
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   border: 1px solid var(--border-subtle);
-  color: var(--text-primary);
+  /* Always dark bg — force white text regardless of page theme */
+  color: #F8F7FF;
   border-bottom-left-radius: 6px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
 }

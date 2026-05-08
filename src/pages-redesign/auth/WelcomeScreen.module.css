@@ -1,0 +1,49 @@
+/**
+ * WelcomeScreen — uses shared authForms primitives.
+ * Adds only Welcome-specific spacing for ageBadge.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.title {
+  composes: title from './authForms.module.css';
+  text-align: center;
+}
+
+.subtitle {
+  composes: subtitle from './authForms.module.css';
+  text-align: center;
+  margin-bottom: 40px;
+}
+
+.actions {
+  composes: actions from './authForms.module.css';
+}
+
+.btnPrimary {
+  composes: btnPrimary from './authForms.module.css';
+}
+
+.btnGhost {
+  composes: btnSecondary from './authForms.module.css';
+}
+
+.ageBadge {
+  margin-top: 28px;
+  padding: 8px 16px;
+  align-self: center;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--rd-text-muted, #9a9aa4);
+  background: var(--rd-bg-surface-soft, #f7f7fa);
+  border-radius: 999px;
+}
+
+:global(.redesign-root[data-theme='dark']) .ageBadge {
+  background: var(--rd-bg-surface, #1a1922);
+  color: var(--rd-text-muted, rgba(245, 245, 247, 0.5));
+}

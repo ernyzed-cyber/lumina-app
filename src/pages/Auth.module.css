@@ -1124,3 +1124,20 @@
   line-height: 1.4;
 }
 
+/* ══════════════════════════════════════
+   Light-theme override — the glass card
+   always has a dark background, so we
+   redefine colour vars to dark-theme
+   values for all card descendants.
+   ══════════════════════════════════════ */
+[data-theme="light"] .card {
+  --text-primary:    #F8F7FF;
+  --text-secondary:  #B8B3CC;
+  --text-muted:      #6B6580;
+  --text-accent:     #C4B5FD;
+  --bg-tertiary:     #1A1625;
+  --border-subtle:   rgba(139, 92, 246, 0.08);
+  --border-default:  rgba(139, 92, 246, 0.15);
+  --border-hover:    rgba(139, 92, 246, 0.3);
+}
+

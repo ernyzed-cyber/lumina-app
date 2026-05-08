@@ -1,0 +1,181 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Avatar — primitive styles.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rd-avatar {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--rd-bg-surface-muted); /* база до того как картинка загрузилась */
+}
+
+.rd-avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+
+/* Fallback initials */
+.rd-avatar-fallback {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-body);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  background: var(--gradient-primary);
+  color: #fff;
+  user-select: none;
+  text-transform: uppercase;
+}
+
+/* ── Sizes ── */
+.rd-avatar-xs  { width: 28px;  height: 28px;  }
+.rd-avatar-sm  { width: 36px;  height: 36px;  }
+.rd-avatar-md  { width: 48px;  height: 48px;  }
+.rd-avatar-lg  { width: 64px;  height: 64px;  }
+.rd-avatar-xl  { width: 88px;  height: 88px;  }
+.rd-avatar-2xl { width: 120px; height: 120px; }
+
+/* Font sizes per size */
+.rd-avatar-xs  .rd-avatar-fallback { font-size: 11px; }
+.rd-avatar-sm  .rd-avatar-fallback { font-size: 13px; }
+.rd-avatar-md  .rd-avatar-fallback { font-size: 17px; }
+.rd-avatar-lg  .rd-avatar-fallback { font-size: 22px; }
+.rd-avatar-xl  .rd-avatar-fallback { font-size: 30px; }
+.rd-avatar-2xl .rd-avatar-fallback { font-size: 40px; }
+
+/* ── Online dot (bottom-LEFT, чтобы не конфликтовать с verified) ── */
+.rd-avatar-online {
+  position: absolute;
+  bottom: 2px;
+  left: 2px;
+  background: var(--rd-status-online);
+  border: 2px solid var(--rd-bg-page);
+  border-radius: 50%;
+  box-shadow: 0 0 0 0 var(--rd-status-online-glow);
+  animation: rdAvatarPulse 2.4s ease-out infinite;
+}
+.rd-avatar-xs  .rd-avatar-online { width: 8px;  height: 8px;  border-width: 1.5px; bottom: 1px; left: 1px; }
+.rd-avatar-sm  .rd-avatar-online { width: 10px; height: 10px; border-width: 2px;   bottom: 1px; left: 1px; }
+.rd-avatar-md  .rd-avatar-online { width: 12px; height: 12px; }
+.rd-avatar-lg  .rd-avatar-online { width: 14px; height: 14px; }
+.rd-avatar-xl  .rd-avatar-online { width: 16px; height: 16px; border-width: 3px; }
+.rd-avatar-2xl .rd-avatar-online { width: 20px; height: 20px; border-width: 3px; }
+
+@keyframes rdAvatarPulse {
+  0%   { box-shadow: 0 0 0 0 var(--rd-status-online-glow); }
+  70%  { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0); }
+}
+
+/* ── Verified badge (bottom-RIGHT) ── */
+.rd-avatar-verified {
+  position: absolute;
+  bottom: 0;
+  right: -2px;
+  background: var(--gradient-primary);
+  border: 2px solid var(--rd-bg-page);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(139, 92, 246, 0.4);
+}
+.rd-avatar-xs  .rd-avatar-verified { width: 12px; height: 12px; border-width: 1px;   right: -1px; }
+.rd-avatar-sm  .rd-avatar-verified { width: 14px; height: 14px; border-width: 1.5px; }
+.rd-avatar-md  .rd-avatar-verified { width: 18px; height: 18px; }
+.rd-avatar-lg  .rd-avatar-verified { width: 22px; height: 22px; }
+.rd-avatar-xl  .rd-avatar-verified { width: 28px; height: 28px; border-width: 3px; }
+.rd-avatar-2xl .rd-avatar-verified { width: 34px; height: 34px; border-width: 3px; }
+
+/* ── Ring (gradient border) ── */
+.rd-avatar-ring {
+  /* двойная тень: внутренняя белая прокладка + внешний цвет */
+  padding: 3px;
+  background-clip: padding-box;
+}
+.rd-avatar-ring::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  padding: 3px;
+  background: var(--rd-ring-brand);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+}
+.rd-avatar-ring-success::before { background: var(--rd-ring-success); }
+.rd-avatar-ring-warm::before    { background: var(--rd-ring-warm); }
+.rd-avatar-ring-cool::before    { background: var(--rd-ring-cool); }
+
+/* для маленьких аватаров уменьшаем толщину кольца */
+.rd-avatar-xs.rd-avatar-ring,
+.rd-avatar-sm.rd-avatar-ring { padding: 2px; }
+.rd-avatar-xs.rd-avatar-ring::before,
+.rd-avatar-sm.rd-avatar-ring::before { padding: 2px; }
+
+/* ── Loading skeleton ── */
+.rd-avatar-loading {
+  background: linear-gradient(
+    90deg,
+    var(--rd-bg-surface-muted) 0%,
+    var(--rd-bg-surface-soft) 50%,
+    var(--rd-bg-surface-muted) 100%
+  );
+  background-size: 200% 100%;
+  animation: rdAvatarShimmer 1.4s ease-in-out infinite;
+}
+@keyframes rdAvatarShimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ── Stacked group ── */
+.rd-avatar-group {
+  display: inline-flex;
+  align-items: center;
+}
+.rd-avatar-group > .rd-avatar {
+  border: 2px solid var(--rd-bg-page);
+  background-clip: padding-box;
+}
+.rd-avatar-group > .rd-avatar + .rd-avatar {
+  margin-left: -10px;
+}
+.rd-avatar-group > .rd-avatar-xs + .rd-avatar-xs { margin-left: -6px; }
+.rd-avatar-group > .rd-avatar-sm + .rd-avatar-sm { margin-left: -8px; }
+.rd-avatar-group > .rd-avatar-lg + .rd-avatar-lg { margin-left: -14px; }
+.rd-avatar-group > .rd-avatar-xl + .rd-avatar-xl { margin-left: -18px; }
+
+.rd-avatar-overflow {
+  background: var(--rd-bg-surface-muted);
+  color: var(--rd-text-secondary);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 13px;
+}
+.rd-avatar-overflow.rd-avatar-xs  { font-size: 10px; }
+.rd-avatar-overflow.rd-avatar-sm  { font-size: 11px; }
+.rd-avatar-overflow.rd-avatar-lg  { font-size: 16px; }
+.rd-avatar-overflow.rd-avatar-xl  { font-size: 20px; }
+.rd-avatar-overflow.rd-avatar-2xl { font-size: 26px; }
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .rd-avatar-online { animation: none; }
+  .rd-avatar-loading { animation: none; }
+}

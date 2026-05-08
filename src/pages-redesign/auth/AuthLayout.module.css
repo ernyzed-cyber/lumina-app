@@ -1,0 +1,268 @@
+/**
+ * AuthLayout — full-screen constellation backdrop + centered glass card.
+ *
+ * Z-order:
+ *   z=0  — .layout backdrop (deep gradient)
+ *   z=1  — ParticleField (canvas)
+ *   z=2  — glow1/glow2/glow3 (soft halo blobs)
+ *   z=3  — vignette
+ *   z=10 — cardWrap + card
+ */
+
+.layout {
+  position: relative;
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  isolation: isolate;
+  /* Очень тёмный базовый фон — Aurora светится поверх */
+  background:
+    radial-gradient(ellipse at 30% 20%, #1a0a2e 0%, #100620 60%, #08041a 100%),
+    linear-gradient(135deg, #08041a 0%, #100620 50%, #1a0a2e 100%);
+}
+
+/* ─────────────────────────────────────────────
+   Soft glow blobs — magic feel, drift slow
+   ───────────────────────────────────────────── */
+.glow1,
+.glow2,
+.glow3 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(100px);
+  z-index: 2;
+  pointer-events: none;
+  mix-blend-mode: screen;
+}
+.glow1 {
+  width: 520px;
+  height: 520px;
+  top: -160px;
+  left: -120px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.32) 0%, transparent 70%);
+  animation: float1 22s ease-in-out infinite;
+}
+.glow2 {
+  width: 460px;
+  height: 460px;
+  bottom: -140px;
+  right: -120px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.32) 0%, transparent 70%);
+  animation: float2 26s ease-in-out infinite;
+}
+.glow3 {
+  width: 380px;
+  height: 380px;
+  top: 40%;
+  left: 60%;
+  background: radial-gradient(circle, rgba(168, 85, 247, 0.24) 0%, transparent 70%);
+  animation: float3 32s ease-in-out infinite;
+}
+
+@keyframes float1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(60px, 40px) scale(1.1); }
+  66% { transform: translate(-30px, 70px) scale(0.92); }
+}
+@keyframes float2 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-50px, -60px) scale(0.9); }
+  66% { transform: translate(40px, -30px) scale(1.12); }
+}
+@keyframes float3 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-80px, 50px) scale(1.15); }
+}
+
+/* ─────────────────────────────────────────────
+   Vignette
+   ───────────────────────────────────────────── */
+.vignette {
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(8, 4, 18, 0.55) 100%);
+}
+
+/* ─────────────────────────────────────────────
+   Glass card — centered, semi-transparent
+   ───────────────────────────────────────────── */
+.cardWrap {
+  position: relative;
+  z-index: 10;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 16px;
+}
+
+.card {
+  width: 100%;
+  max-width: 480px;
+  padding: 36px 32px 32px;
+  border-radius: 24px;
+  /* Сильно прозрачное матовое стекло — фон просвечивает */
+  background: rgba(28, 18, 56, 0.18);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(255, 255, 255, 0.10);
+  box-shadow:
+    0 24px 80px rgba(8, 4, 18, 0.45),
+    0 8px 24px rgba(139, 92, 246, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  color: #f4f1fb;
+  animation: cardIn 600ms cubic-bezier(0.2, 0.8, 0.3, 1) both;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Card top sheen — subtle highlight на верхней грани */
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 80px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06) 0%, transparent 100%);
+  pointer-events: none;
+}
+
+@keyframes cardIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ─────────────────────────────────────────────
+   Brand mark — sits at top of card
+   ───────────────────────────────────────────── */
+.brand {
+  font-family: var(--rd-font-display, 'Playfair Display', serif);
+  font-size: 22px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  background: linear-gradient(135deg, #c4b5fd 0%, #f9a8d4 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 20px;
+  position: relative;
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────
+   Progress (onboarding)
+   ───────────────────────────────────────────── */
+.progress {
+  margin-bottom: 24px;
+  position: relative;
+  z-index: 1;
+}
+.progressLabel {
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 251, 0.65);
+  margin-bottom: 10px;
+  font-weight: 500;
+}
+.progressTrack {
+  display: flex;
+  gap: 6px;
+}
+.progressDot {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: rgba(255, 255, 255, 0.12);
+  transition: background 360ms cubic-bezier(0.2, 0.8, 0.3, 1),
+              box-shadow 400ms cubic-bezier(0.2, 0.8, 0.3, 1),
+              transform 320ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.progressDot[data-active='true'] {
+  background: linear-gradient(90deg, #8b5cf6 0%, #ec4899 100%);
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.5), 0 0 6px rgba(139, 92, 246, 0.4);
+  transform: scaleY(1.4);
+}
+
+/* ─────────────────────────────────────────────
+   Content area
+   ───────────────────────────────────────────── */
+.content {
+  position: relative;
+  z-index: 1;
+}
+
+/* ─────────────────────────────────────────────
+   Reduced motion
+   ───────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .glow1, .glow2, .glow3, .card, .progressDot {
+    animation: none;
+    transition: none;
+  }
+}
+
+/* ─────────────────────────────────────────────
+   Mobile (<480px)
+   ───────────────────────────────────────────── */
+@media (max-width: 479px) {
+  .card {
+    padding: 28px 22px 24px;
+    border-radius: 20px;
+  }
+  .brand { font-size: 20px; margin-bottom: 16px; }
+  .progress { margin-bottom: 18px; }
+  .glow1 { width: 320px; height: 320px; }
+  .glow2 { width: 280px; height: 280px; }
+  .glow3 { display: none; }
+}
+
+/* ─────────────────────────────────────────────
+   Light theme override (preview-toggle scope)
+   ───────────────────────────────────────────── */
+:global(.redesign-root[data-theme='light']) .layout,
+:global(:root[data-redesign-theme='light']) .layout {
+  background:
+    radial-gradient(ellipse at 30% 20%, #f5e8ff 0%, #ede0fa 50%, #e0d4f5 100%),
+    linear-gradient(135deg, #fdf4ff 0%, #f3e8ff 50%, #fae8ff 100%);
+}
+:global(.redesign-root[data-theme='light']) .card,
+:global(:root[data-redesign-theme='light']) .card {
+  background: rgba(255, 255, 255, 0.32);
+  backdrop-filter: blur(40px) saturate(180%);
+  -webkit-backdrop-filter: blur(40px) saturate(180%);
+  border: 1px solid rgba(139, 92, 246, 0.18);
+  color: #1a1625;
+  box-shadow:
+    0 24px 80px rgba(139, 92, 246, 0.18),
+    0 8px 24px rgba(236, 72, 153, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+/* Brand "Lumina" — в light theme делаем насыщеннее */
+:global(.redesign-root[data-theme='light']) .brand,
+:global(:root[data-redesign-theme='light']) .brand {
+  background: linear-gradient(135deg, #7c3aed 0%, #db2777 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+:global(.redesign-root[data-theme='light']) .progressLabel,
+:global(:root[data-redesign-theme='light']) .progressLabel {
+  color: #5b3a8c;
+  font-weight: 600;
+}
+:global(.redesign-root[data-theme='light']) .progressDot,
+:global(:root[data-redesign-theme='light']) .progressDot {
+  background: rgba(139, 92, 246, 0.22);
+}
+:global(.redesign-root[data-theme='light']) .vignette,
+:global(:root[data-redesign-theme='light']) .vignette {
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(139, 92, 246, 0.08) 100%);
+}

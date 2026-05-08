@@ -1,0 +1,390 @@
+/* ═══════════════════════════════════════════════════════════════════
+   HeroSection — full-viewport split layout.
+   Слева: editorial title + lede + CTAs.
+   Справа: breathing portrait card.
+   Фон: mesh-blobs (мягкие).
+   ═══════════════════════════════════════════════════════════════════ */
+
+.hero {
+  position: relative;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  padding: 80px 24px 48px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.hero-inner {
+  width: 100%;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 64px;
+  align-items: center;
+}
+
+@media (max-width: 960px) {
+  .hero {
+    padding: 96px 20px 56px;
+    min-height: auto;
+  }
+  .hero-inner {
+    grid-template-columns: 1fr;
+    gap: 48px;
+    text-align: center;
+  }
+  .hero-left {
+    align-items: center;
+  }
+  .hero-cta-row {
+    justify-content: center;
+  }
+}
+
+/* ── Mesh blobs ──────────────────────────────────────────── */
+.hero-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  opacity: 0.55;
+  z-index: -1;
+  pointer-events: none;
+  will-change: transform;
+}
+
+.hero-blob-1 {
+  top: -120px;
+  left: -100px;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(139, 92, 246, 0.55) 0%, rgba(139, 92, 246, 0) 70%);
+  animation: heroBlobFloat 14s ease-in-out infinite;
+}
+
+.hero-blob-2 {
+  bottom: -160px;
+  right: -120px;
+  width: 560px;
+  height: 560px;
+  background: radial-gradient(circle, rgba(236, 72, 153, 0.45) 0%, rgba(236, 72, 153, 0) 70%);
+  animation: heroBlobFloat 18s ease-in-out infinite reverse;
+}
+
+.hero-blob-3 {
+  top: 30%;
+  left: 40%;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(244, 114, 182, 0.3) 0%, rgba(244, 114, 182, 0) 70%);
+  animation: heroBlobFloat 22s ease-in-out infinite;
+}
+
+@keyframes heroBlobFloat {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(40px, -30px) scale(1.05); }
+  66% { transform: translate(-30px, 40px) scale(0.95); }
+}
+
+/* ── Left column ─────────────────────────────────────────── */
+.hero-left {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 28px;
+}
+
+.hero-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  background: var(--rd-bg-surface);
+  border: 1px solid var(--rd-border-subtle);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--rd-text-secondary);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.hero-eyebrow-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rd-status-success);
+  box-shadow: 0 0 12px var(--rd-status-success);
+  animation: heroDotPulse 2s ease-in-out infinite;
+}
+
+@keyframes heroDotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.85); }
+}
+
+.hero-title {
+  font-family: var(--font-display);
+  font-size: clamp(44px, 7vw, 88px);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.03em;
+  margin: 0;
+  color: var(--rd-text-primary);
+}
+
+.hero-title-accent {
+  font-style: italic;
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  display: inline-block;
+}
+
+.hero-lede {
+  font-size: 18px;
+  line-height: 1.55;
+  color: var(--rd-text-secondary);
+  max-width: 480px;
+  margin: 0;
+}
+
+.hero-cta-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.hero-trust {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+  font-size: 13px;
+  color: var(--rd-text-muted);
+}
+
+.hero-trust-stars {
+  display: inline-flex;
+  gap: 2px;
+  color: var(--rd-status-warning);
+}
+
+.hero-trust-divider {
+  width: 1px;
+  height: 14px;
+  background: var(--rd-border-default);
+}
+
+/* ── Right column: portrait card ─────────────────────────── */
+.hero-right {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  position: relative;
+  perspective: 1200px;
+}
+
+.hero-portrait {
+  position: relative;
+  width: 380px;
+  max-width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: 28px;
+  overflow: hidden;
+  background: linear-gradient(135deg,
+    rgba(139, 92, 246, 0.35) 0%,
+    rgba(236, 72, 153, 0.4) 50%,
+    rgba(244, 114, 182, 0.35) 100%
+  );
+  box-shadow:
+    0 32px 64px -16px rgba(15, 12, 30, 0.5),
+    0 16px 32px -8px rgba(139, 92, 246, 0.35),
+    inset 0 0 0 1px rgba(255, 255, 255, 0.08);
+  isolation: isolate;
+}
+
+/* Когда внутри реальный phone-mockup без фона — снимаем рамку/тень/clip */
+.hero-portrait[data-no-card='true'] {
+  background: transparent;
+  border-radius: 0;
+  overflow: visible;
+  box-shadow: none;
+  width: clamp(280px, 32vw, 420px);
+  aspect-ratio: auto;
+}
+
+.hero-phone {
+  display: block;
+  width: 100%;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 30px 60px rgba(15, 12, 30, 0.55))
+    drop-shadow(0 12px 28px rgba(139, 92, 246, 0.42));
+  user-select: none;
+  -webkit-user-drag: none;
+  position: relative;
+  z-index: 1;
+}
+
+.hero-portrait-glow {
+  position: absolute;
+  inset: -40px;
+  border-radius: 28px;
+  background: var(--gradient-primary);
+  filter: blur(50px);
+  opacity: 0.4;
+  z-index: -1;
+}
+
+/* Placeholder контента портрета — иконка и градиент-fill */
+.hero-portrait-placeholder {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 255, 255, 0.85);
+  font-family: var(--font-display);
+  font-size: clamp(72px, 8vw, 120px);
+  font-weight: 700;
+  letter-spacing: -0.04em;
+  text-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
+}
+
+.hero-portrait-placeholder-icon {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  color: rgba(255, 255, 255, 0.85);
+  filter: drop-shadow(0 4px 12px rgba(0, 0, 0, 0.3));
+  z-index: 2;
+}
+
+.hero-portrait-grain {
+  position: absolute;
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 20% 30%, rgba(255, 255, 255, 0.18), transparent 40%),
+    radial-gradient(circle at 70% 70%, rgba(0, 0, 0, 0.22), transparent 50%);
+  mix-blend-mode: overlay;
+  pointer-events: none;
+}
+
+/* Bottom info card на портрете */
+.hero-portrait-info {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 16px;
+  padding: 14px 16px;
+  border-radius: 18px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  z-index: 2;
+}
+
+.hero-portrait-info-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.hero-portrait-name {
+  font-family: var(--font-display);
+  font-size: 18px;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.hero-portrait-verified {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #60A5FA;
+}
+
+.hero-portrait-meta {
+  font-size: 12.5px;
+  color: rgba(255, 255, 255, 0.78);
+  margin: 0;
+}
+
+/* Floating online chip */
+.hero-online-chip {
+  position: absolute;
+  top: 24px;
+  left: 24px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.42);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: #FFFFFF;
+  z-index: 2;
+}
+
+.hero-online-chip-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rd-status-success);
+  box-shadow: 0 0 8px var(--rd-status-success);
+  animation: heroDotPulse 1.6s ease-in-out infinite;
+}
+
+/* Distance pill — снизу карточки, вылезает наружу */
+.hero-distance-pill {
+  position: absolute;
+  bottom: -18px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 8px 16px;
+  border-radius: 999px;
+  background: var(--rd-bg-surface);
+  border: 1px solid var(--rd-border-default);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rd-text-primary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 8px 24px -8px rgba(15, 12, 30, 0.4);
+  white-space: nowrap;
+  z-index: 3;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .hero-blob-1,
+  .hero-blob-2,
+  .hero-blob-3,
+  .hero-eyebrow-dot,
+  .hero-online-chip-dot {
+    animation: none !important;
+  }
+}

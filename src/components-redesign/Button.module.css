@@ -1,0 +1,240 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Button — primitive styles. Все размеры/цвета через --rd-* токены.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rd-btn {
+  /* Reset */
+  appearance: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: none;
+  font-family: var(--font-body);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+
+  /* Layout — relative для spinner-overlay */
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--rd-radius-pill);
+  overflow: hidden;
+  isolation: isolate;
+
+  transition:
+    transform var(--rd-duration-micro) var(--ease-spring),
+    box-shadow var(--rd-duration-micro) var(--ease-smooth),
+    background-color var(--rd-duration-micro) var(--ease-smooth),
+    background var(--rd-duration-micro) var(--ease-smooth),
+    color var(--rd-duration-micro) var(--ease-smooth),
+    opacity var(--rd-duration-micro) var(--ease-smooth),
+    filter var(--rd-duration-micro) var(--ease-smooth);
+}
+
+.rd-btn:focus-visible {
+  outline: 2px solid var(--rd-text-accent);
+  outline-offset: 3px;
+}
+
+.rd-btn:active:not(:disabled, [aria-disabled='true']) {
+  transform: scale(0.96);
+}
+
+.rd-btn:disabled,
+.rd-btn[aria-disabled='true'] {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ── Контент-обёртка (видна когда не loading) ── */
+.rd-btn-content {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.rd-btn-loading .rd-btn-content {
+  visibility: hidden;
+}
+
+.rd-btn-label {
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+}
+
+.rd-btn-icon-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  flex-shrink: 0;
+}
+
+.rd-btn-icon-slot > svg {
+  display: block;
+  width: 1.15em;
+  height: 1.15em;
+}
+
+/* ── Sizes ── */
+.rd-btn-sm {
+  font-size: 13px;
+  padding: 0 16px;
+  height: 36px;
+  gap: 6px;
+}
+
+.rd-btn-md {
+  font-size: 15px;
+  padding: 0 24px;
+  height: 48px;
+}
+
+.rd-btn-lg {
+  font-size: 17px;
+  padding: 0 32px;
+  height: 56px;
+}
+
+/* ── Variants ── */
+
+/* gradient — primary CTA */
+.rd-btn-gradient {
+  background: var(--gradient-primary);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(139, 92, 246, 0.35);
+}
+.rd-btn-gradient:hover:not(:disabled, [aria-disabled='true']) {
+  box-shadow: 0 6px 24px rgba(139, 92, 246, 0.5);
+  transform: translateY(-1px);
+}
+
+/* glass — secondary on blurred surfaces */
+.rd-btn-glass {
+  background: var(--rd-glass-bg);
+  backdrop-filter: blur(var(--rd-glass-blur));
+  -webkit-backdrop-filter: blur(var(--rd-glass-blur));
+  border: 1px solid var(--rd-glass-border);
+  color: var(--rd-text-primary);
+  box-shadow: var(--rd-shadow-sm);
+}
+.rd-btn-glass:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--rd-glass-bg-strong);
+  box-shadow: var(--rd-shadow-md);
+  transform: translateY(-1px);
+}
+
+/* solid — brand fill, no gradient */
+.rd-btn-solid {
+  background-color: var(--rd-fill-brand);
+  color: var(--rd-text-on-brand);
+  box-shadow: var(--rd-shadow-sm);
+}
+.rd-btn-solid:hover:not(:disabled, [aria-disabled='true']) {
+  background-color: var(--rd-fill-brand-hover);
+  transform: translateY(-1px);
+  box-shadow: var(--rd-shadow-md);
+}
+.rd-btn-solid:active:not(:disabled, [aria-disabled='true']) {
+  background-color: var(--rd-fill-brand-active);
+}
+
+/* ghost — transparent, brand border */
+.rd-btn-ghost {
+  background: transparent;
+  color: var(--rd-text-accent);
+  border: 1.5px solid var(--rd-border-brand);
+}
+.rd-btn-ghost:hover:not(:disabled, [aria-disabled='true']) {
+  background: var(--rd-fill-brand-soft);
+  border-color: var(--rd-border-brand-strong);
+  transform: translateY(-1px);
+}
+
+/* destructive — для опасных действий (Удалить аккаунт, Расстаться) */
+.rd-btn-destructive {
+  background-color: var(--rd-fill-destructive);
+  color: #fff;
+  box-shadow: 0 4px 16px rgba(239, 68, 68, 0.3);
+}
+.rd-btn-destructive:hover:not(:disabled, [aria-disabled='true']) {
+  background-color: var(--rd-fill-destructive-hover);
+  box-shadow: 0 6px 24px rgba(239, 68, 68, 0.45);
+  transform: translateY(-1px);
+}
+
+/* ── Icon-only button ── */
+.rd-btn-icon {
+  padding: 0;
+  border-radius: 50%;
+  aspect-ratio: 1;
+}
+.rd-btn-icon.rd-btn-sm { width: 36px; height: 36px; }
+.rd-btn-icon.rd-btn-md { width: 48px; height: 48px; }
+.rd-btn-icon.rd-btn-lg { width: 56px; height: 56px; }
+
+.rd-btn-icon .rd-btn-icon-slot > svg {
+  width: 1.25em;
+  height: 1.25em;
+}
+
+/* ── Loading spinner overlay ── */
+.rd-btn-spinner-wrap {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+.rd-btn-spinner {
+  width: 1.15em;
+  height: 1.15em;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  border-radius: 50%;
+  animation: rdBtnSpin 0.65s linear infinite;
+  opacity: 0.85;
+}
+
+.rd-btn-gradient .rd-btn-spinner,
+.rd-btn-solid .rd-btn-spinner,
+.rd-btn-destructive .rd-btn-spinner {
+  border-color: rgba(255, 255, 255, 0.45);
+  border-top-color: #fff;
+}
+
+.rd-btn-ghost .rd-btn-spinner,
+.rd-btn-glass .rd-btn-spinner {
+  border-color: rgba(139, 92, 246, 0.25);
+  border-top-color: var(--rd-text-accent);
+}
+
+@keyframes rdBtnSpin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── Full-width modifier ── */
+.rd-btn-full {
+  width: 100%;
+}
+
+/* ── Reduced motion: глушим transform-hover'ы и spinner ── */
+@media (prefers-reduced-motion: reduce) {
+  .rd-btn,
+  .rd-btn:hover:not(:disabled, [aria-disabled='true']),
+  .rd-btn:active:not(:disabled, [aria-disabled='true']) {
+    transform: none !important;
+  }
+  .rd-btn-spinner {
+    animation-duration: 1.5s;
+  }
+}

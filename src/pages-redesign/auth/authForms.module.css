@@ -1,0 +1,609 @@
+/**
+ * authForms — shared form primitives для всех экранов /auth.
+ *
+ * Используется через `import s from './authForms.module.css'` и точечное
+ * применение классов. CSS Modules не дают глобального scope, поэтому каждый
+ * step импортирует этот файл и применяет классы напрямую.
+ *
+ * Public classes:
+ *   .title         — заголовок шага (Playfair, 28-32px)
+ *   .subtitle      — подзаголовок (body font, muted)
+ *   .field         — wrapper над <input>
+ *   .label         — label
+ *   .input         — text input (44px height, brand focus ring)
+ *   .selectInput   — <select> вариант (для DOB)
+ *   .btnPrimary    — gradient brand button (full-width, 48px)
+ *   .btnSecondary  — outline button
+ *   .btnGoogle     — Google OAuth button (white + border + Google logo slot)
+ *   .btnGhost      — text button
+ *   .divider       — "or" divider
+ *   .actions       — flex column gap=12px
+ *   .footerNav     — "Already have account? Sign in" link block
+ *   .footerLink    — accent link inside footerNav
+ *   .errorText     — inline error
+ *   .checkbox      — terms checkbox row
+ */
+
+.title {
+  font-family: var(--rd-font-display, 'Playfair Display', serif);
+  font-size: clamp(26px, 4vw, 32px);
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: -0.015em;
+  color: #1a1625;
+  margin: 0 0 12px;
+}
+
+.subtitle {
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 15px;
+  line-height: 1.55;
+  color: #6b6480;
+  margin: 0 0 32px;
+}
+
+.field {
+  margin-bottom: 16px;
+}
+
+.label {
+  display: block;
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--rd-text-secondary, #5b5b66);
+  margin-bottom: 6px;
+}
+
+.input,
+.selectInput {
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 15px;
+  color: var(--rd-text-primary, #1a1a1f);
+  background: #ffffff;
+  border: 1px solid var(--rd-border-default, #e1e1e6);
+  border-radius: 12px;
+  outline: none;
+  transition: border-color 160ms ease, box-shadow 160ms ease;
+  box-sizing: border-box;
+}
+
+.input::placeholder {
+  color: var(--rd-text-muted, #9a9aa4);
+}
+
+.input:focus,
+.selectInput:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+}
+
+.selectInput {
+  appearance: none;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%239a9aa4' d='M6 8L0 0h12z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  padding-right: 40px;
+  cursor: pointer;
+}
+
+/* ── Buttons ── */
+.btnPrimary,
+.btnSecondary,
+.btnGoogle,
+.btnGhost {
+  width: 100%;
+  height: 48px;
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  border-radius: 12px;
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 160ms ease, background 160ms ease, border-color 160ms ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  border: none;
+  box-sizing: border-box;
+}
+
+.btnPrimary {
+  color: #ffffff;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  box-shadow: 0 8px 20px rgba(139, 92, 246, 0.25);
+}
+.btnPrimary:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 28px rgba(139, 92, 246, 0.32);
+}
+.btnPrimary:active:not(:disabled) {
+  transform: translateY(0);
+}
+.btnPrimary:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.btnSecondary {
+  color: var(--rd-text-primary, #1a1a1f);
+  background: #ffffff;
+  border: 1.5px solid var(--rd-border-default, #e1e1e6);
+}
+.btnSecondary:hover:not(:disabled) {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+}
+
+.btnGoogle {
+  color: var(--rd-text-primary, #1a1a1f);
+  background: #ffffff;
+  border: 1.5px solid var(--rd-border-default, #e1e1e6);
+}
+.btnGoogle:hover:not(:disabled) {
+  border-color: var(--rd-text-primary, #1a1a1f);
+  background: #fafafa;
+}
+.btnGoogle:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.btnGhost {
+  color: var(--rd-text-secondary, #5b5b66);
+  background: transparent;
+  height: auto;
+  padding: 8px 12px;
+  font-weight: 500;
+}
+.btnGhost:hover:not(:disabled) {
+  color: #8b5cf6;
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 24px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0;
+  color: var(--rd-text-muted, #9a9aa4);
+  font-size: 13px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--rd-border-subtle, #ebebef);
+}
+
+.footerNav {
+  margin-top: 24px;
+  text-align: center;
+  font-size: 14px;
+  color: var(--rd-text-secondary, #5b5b66);
+}
+
+.footerLink {
+  background: none;
+  border: none;
+  padding: 0;
+  margin-left: 6px;
+  color: #8b5cf6;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+}
+.footerLink:hover {
+  color: #ec4899;
+  text-decoration: underline;
+}
+
+.errorText {
+  font-size: 13px;
+  color: #dc2626;
+  margin-top: 6px;
+}
+
+.checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--rd-text-secondary, #5b5b66);
+  margin: 16px 0;
+  cursor: pointer;
+}
+.checkbox input[type='checkbox'] {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  accent-color: #8b5cf6;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.checkbox a {
+  color: #8b5cf6;
+  text-decoration: underline;
+}
+
+/* ── Card-grid (для gender / goal cards) ── */
+.cardGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+.card {
+  position: relative;
+  padding: 28px 16px;
+  border-radius: 18px;
+  border: 1.5px solid var(--rd-border-default, #e1e1e6);
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(12px) saturate(160%);
+  -webkit-backdrop-filter: blur(12px) saturate(160%);
+  cursor: pointer;
+  text-align: center;
+  font-family: var(--rd-font-body, system-ui, sans-serif);
+  font-size: 15px;
+  font-weight: 600;
+  color: #1a1625;
+  transition: border-color 200ms ease, transform 180ms cubic-bezier(0.2, 0.9, 0.3, 1.2),
+              box-shadow 220ms ease, background 220ms ease;
+  overflow: hidden;
+}
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.06) 0%, rgba(236, 72, 153, 0.06) 100%);
+  opacity: 0;
+  transition: opacity 220ms ease;
+  pointer-events: none;
+}
+.card:hover {
+  border-color: rgba(139, 92, 246, 0.5);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 12px 32px rgba(139, 92, 246, 0.18), 0 4px 12px rgba(236, 72, 153, 0.08);
+}
+.card:hover::before {
+  opacity: 1;
+}
+.card[data-selected='true'] {
+  border-color: #8b5cf6;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(236, 72, 153, 0.10) 100%);
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.22);
+  transform: translateY(-2px);
+}
+.card[data-selected='true']::before {
+  opacity: 1;
+}
+.cardIcon {
+  display: block;
+  font-size: 32px;
+  margin-bottom: 10px;
+  position: relative;
+  z-index: 1;
+  animation: iconFloat 4s ease-in-out infinite;
+  filter: drop-shadow(0 4px 12px rgba(139, 92, 246, 0.18));
+}
+.card[data-selected='true'] .cardIcon {
+  animation: iconPulse 1.6s ease-in-out infinite;
+}
+@keyframes iconFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+@keyframes iconPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.12); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cardIcon { animation: none; }
+}
+
+/* ── Chip row (для popular cities) ── */
+.chipRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+.chip {
+  padding: 8px 14px;
+  border-radius: 20px;
+  border: 1px solid var(--rd-border-default, #e1e1e6);
+  background: #ffffff;
+  font-size: 13px;
+  color: var(--rd-text-secondary, #5b5b66);
+  cursor: pointer;
+  transition: all 160ms ease;
+}
+.chip:hover,
+.chip[data-selected='true'] {
+  border-color: #8b5cf6;
+  color: #8b5cf6;
+  background: rgba(139, 92, 246, 0.05);
+}
+
+/* ── Back button (top-left of step) ── */
+.backBtn {
+  background: none;
+  border: none;
+  padding: 8px;
+  margin: -8px 0 16px -8px;
+  font-size: 14px;
+  color: var(--rd-text-secondary, #5b5b66);
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.backBtn:hover {
+  color: #8b5cf6;
+}
+
+/* ── Password toggle wrapper ── */
+.passwordWrap {
+  position: relative;
+}
+.passwordToggle {
+  position: absolute;
+  right: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--rd-text-muted, #9a9aa4);
+  padding: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.passwordToggle:hover {
+  color: #8b5cf6;
+}
+
+/* ── Forgot link inline ── */
+.forgotLink {
+  display: block;
+  margin: 8px 0 16px;
+  text-align: right;
+  font-size: 13px;
+  background: none;
+  border: none;
+  padding: 0;
+  color: #8b5cf6;
+  cursor: pointer;
+  margin-left: auto;
+}
+.forgotLink:hover {
+  text-decoration: underline;
+}
+
+/* ── DOB row (3 selects: day/month/year) ── */
+.dobRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+}
+
+/* ── Turnstile widget container ── */
+.turnstileWrap {
+  margin: 16px 0;
+  display: flex;
+  justify-content: center;
+  min-height: 65px;
+}
+
+/* ── Forgot password modal ── */
+.modalBackdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 14, 19, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 20px;
+  animation: modalFadeIn 200ms ease;
+}
+.modal {
+  background: #ffffff;
+  border-radius: 20px;
+  padding: 28px;
+  width: 100%;
+  max-width: 400px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  animation: modalSlideIn 240ms cubic-bezier(0.2, 0.9, 0.3, 1);
+}
+.modalTitle {
+  font-family: var(--rd-font-display, 'Playfair Display', serif);
+  font-size: 22px;
+  font-weight: 500;
+  color: var(--rd-text-primary, #1a1a1f);
+  margin: 0 0 8px;
+}
+.modalText {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--rd-text-secondary, #5b5b66);
+  margin: 0 0 20px;
+}
+.modalActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+@keyframes modalFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes modalSlideIn {
+  from { opacity: 0; transform: translateY(20px) scale(0.96); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Light theme (preview-toggle scope) — inputs/buttons на полупрозрачной glass card ── */
+:global(.redesign-root[data-theme='light']) .input,
+:global(.redesign-root[data-theme='light']) .selectInput,
+:global(:root[data-redesign-theme='light']) .input,
+:global(:root[data-redesign-theme='light']) .selectInput {
+  background-color: rgba(255, 255, 255, 0.95);
+  border: 1.5px solid rgba(139, 92, 246, 0.28);
+  color: #1a1625;
+}
+:global(.redesign-root[data-theme='light']) .input:focus,
+:global(.redesign-root[data-theme='light']) .selectInput:focus,
+:global(:root[data-redesign-theme='light']) .input:focus,
+:global(:root[data-redesign-theme='light']) .selectInput:focus {
+  border-color: #8b5cf6;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.18);
+}
+:global(.redesign-root[data-theme='light']) .btnSecondary,
+:global(.redesign-root[data-theme='light']) .btnGoogle,
+:global(.redesign-root[data-theme='light']) .chip,
+:global(:root[data-redesign-theme='light']) .btnSecondary,
+:global(:root[data-redesign-theme='light']) .btnGoogle,
+:global(:root[data-redesign-theme='light']) .chip {
+  background-color: rgba(255, 255, 255, 0.92);
+  border-color: rgba(139, 92, 246, 0.28);
+}
+:global(.redesign-root[data-theme='light']) .label,
+:global(:root[data-redesign-theme='light']) .label {
+  color: #4a3a6e;
+  font-weight: 600;
+}
+:global(.redesign-root[data-theme='light']) .subtitle,
+:global(:root[data-redesign-theme='light']) .subtitle {
+  color: #5b4a7d;
+}
+:global(.redesign-root[data-theme='light']) .footerNav,
+:global(:root[data-redesign-theme='light']) .footerNav {
+  color: #5b4a7d;
+}
+
+/* ── Dark mode (preview-toggle scope) ── */
+:global(.redesign-root[data-theme='dark']) .title {
+  color: #f4f1fb;
+}
+:global(.redesign-root[data-theme='dark']) .subtitle,
+:global(.redesign-root[data-theme='dark']) .footerNav,
+:global(.redesign-root[data-theme='dark']) .checkbox,
+:global(.redesign-root[data-theme='dark']) .label {
+  color: rgba(244, 241, 251, 0.78);
+}
+:global(.redesign-root[data-theme='dark']) .input,
+:global(.redesign-root[data-theme='dark']) .selectInput {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f4f1fb;
+  backdrop-filter: blur(8px);
+}
+:global(.redesign-root[data-theme='dark']) .input:focus,
+:global(.redesign-root[data-theme='dark']) .selectInput:focus {
+  border-color: #c4b5fd;
+  background-color: rgba(255, 255, 255, 0.10);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.28);
+}
+:global(.redesign-root[data-theme='dark']) .btnSecondary,
+:global(.redesign-root[data-theme='dark']) .btnGoogle,
+:global(.redesign-root[data-theme='dark']) .chip {
+  background-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.14);
+  color: #f4f1fb;
+}
+:global(.redesign-root[data-theme='dark']) .btnGoogle:hover:not(:disabled),
+:global(.redesign-root[data-theme='dark']) .btnSecondary:hover:not(:disabled) {
+  background-color: rgba(255, 255, 255, 0.12);
+  border-color: rgba(196, 181, 253, 0.5);
+  color: #c4b5fd;
+}
+:global(.redesign-root[data-theme='dark']) .chip:hover,
+:global(.redesign-root[data-theme='dark']) .chip[data-selected='true'] {
+  background-color: rgba(139, 92, 246, 0.22);
+  border-color: rgba(196, 181, 253, 0.6);
+  color: #f4f1fb;
+}
+:global(.redesign-root[data-theme='dark']) .input::placeholder {
+  color: rgba(244, 241, 251, 0.4);
+}
+:global(.redesign-root[data-theme='dark']) .selectInput {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path fill='%23c4b5fd' d='M6 8L0 0h12z'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+}
+/* gender / goal cards */
+:global(.redesign-root[data-theme='dark']) .card {
+  background-color: rgba(255, 255, 255, 0.05);
+  border-color: rgba(255, 255, 255, 0.12);
+  color: #f4f1fb;
+  backdrop-filter: blur(12px) saturate(160%);
+}
+:global(.redesign-root[data-theme='dark']) .card:hover {
+  border-color: rgba(196, 181, 253, 0.5);
+  background-color: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 12px 32px rgba(139, 92, 246, 0.25), 0 4px 12px rgba(236, 72, 153, 0.12);
+}
+:global(.redesign-root[data-theme='dark']) .card[data-selected='true'] {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.28) 0%, rgba(236, 72, 153, 0.22) 100%);
+  border-color: #c4b5fd;
+  box-shadow: 0 8px 24px rgba(139, 92, 246, 0.4), 0 0 0 1px rgba(196, 181, 253, 0.4);
+}
+:global(.redesign-root[data-theme='dark']) .footerLink {
+  color: #c4b5fd;
+}
+:global(.redesign-root[data-theme='dark']) .footerLink:hover {
+  color: #f9a8d4;
+}
+:global(.redesign-root[data-theme='dark']) .modal {
+  background: rgba(28, 18, 56, 0.92);
+  color: #f4f1fb;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(24px);
+}
+:global(.redesign-root[data-theme='dark']) .modalTitle {
+  color: #f4f1fb;
+}
+:global(.redesign-root[data-theme='dark']) .modalText {
+  color: rgba(244, 241, 251, 0.75);
+}
+:global(.redesign-root[data-theme='dark']) .backBtn {
+  color: rgba(244, 241, 251, 0.7);
+}
+:global(.redesign-root[data-theme='dark']) .backBtn:hover {
+  color: #c4b5fd;
+}
+:global(.redesign-root[data-theme='dark']) .forgotLink {
+  color: #c4b5fd;
+}
+:global(.redesign-root[data-theme='dark']) .errorText {
+  color: #fca5a5;
+}
+:global(.redesign-root[data-theme='dark']) .divider {
+  color: rgba(244, 241, 251, 0.5);
+}
+:global(.redesign-root[data-theme='dark']) .divider::before,
+:global(.redesign-root[data-theme='dark']) .divider::after {
+  background: rgba(255, 255, 255, 0.12);
+}
+:global(.redesign-root[data-theme='dark']) .checkbox a {
+  color: #c4b5fd;
+}

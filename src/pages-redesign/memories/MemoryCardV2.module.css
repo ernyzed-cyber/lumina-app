@@ -1,0 +1,287 @@
+.card {
+  --memory-accent: rgba(139, 92, 246, 0.55);
+  --memory-glow: rgba(236, 72, 153, 0.32);
+
+  position: relative;
+  display: block;
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  border-radius: 18px;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.015) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  overflow: hidden;
+  transition:
+    border-color var(--rd-duration-default, 220ms) var(--ease-smooth, ease),
+    box-shadow var(--rd-duration-default, 220ms) var(--ease-smooth, ease),
+    transform var(--rd-duration-default, 220ms) var(--ease-smooth, ease);
+}
+
+.card.interactive:hover {
+  border-color: rgba(255, 255, 255, 0.13);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.36),
+    0 0 30px var(--memory-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+.card.expanded {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow:
+    0 16px 40px rgba(0, 0, 0, 0.42),
+    0 0 40px var(--memory-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* ─── Header (clickable area) ─── */
+.header {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  padding: 0;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.card:not(.interactive) .header {
+  cursor: default;
+}
+
+.header:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.4);
+  outline-offset: 4px;
+  border-radius: 18px;
+}
+
+/* ─── Left mood-tinted accent slash ─── */
+.accent {
+  flex: 0 0 3px;
+  align-self: stretch;
+  border-radius: 0;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--memory-accent) 18%,
+    var(--memory-accent) 82%,
+    transparent 100%
+  );
+  box-shadow: 0 0 16px var(--memory-glow);
+}
+
+/* ─── Body ─── */
+.body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 22px 18px 18px;
+  min-width: 0;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  color: rgba(255, 244, 240, 0.42);
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.eyebrowDot {
+  opacity: 0.5;
+}
+
+.eyebrowTime {
+  text-transform: none;
+  letter-spacing: 0;
+  font-weight: 400;
+  color: rgba(255, 244, 240, 0.55);
+}
+
+.quote {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.92);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(16px, 2vw, 18px);
+  line-height: 1.55;
+  letter-spacing: 0.005em;
+}
+
+.milestoneTitle {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.96);
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  font-size: clamp(17px, 2.2vw, 20px);
+  line-height: 1.3;
+}
+
+.milestoneSubtitle {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.6);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+.hint {
+  margin: 6px 0 0;
+  color: rgba(255, 244, 240, 0.35);
+  font-family: var(--font-body);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+/* ─── Expanded context ─── */
+.contextWrap {
+  overflow: hidden;
+}
+
+.context {
+  margin-left: 3px;
+  padding: 0 22px 18px 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.contextEyebrow {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.34);
+  font-family: var(--font-body);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.contextLine {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.66);
+  font-family: var(--font-body);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
+.contextAfter {
+  color: rgba(255, 244, 240, 0.5);
+  font-style: italic;
+}
+
+/* ─── Light theme ─── */
+:global(.redesign-root[data-theme='light']) .card,
+:global(:root[data-redesign-theme='light']) .card {
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.7) 0%,
+    rgba(255, 255, 255, 0.5) 100%
+  );
+  border-color: rgba(91, 33, 182, 0.1);
+  box-shadow:
+    0 6px 18px rgba(120, 80, 120, 0.1),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+}
+
+:global(.redesign-root[data-theme='light']) .card.interactive:hover,
+:global(:root[data-redesign-theme='light']) .card.interactive:hover {
+  border-color: rgba(91, 33, 182, 0.18);
+  box-shadow:
+    0 10px 28px rgba(120, 80, 120, 0.16),
+    0 0 24px var(--memory-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+:global(.redesign-root[data-theme='light']) .card.expanded,
+:global(:root[data-redesign-theme='light']) .card.expanded {
+  border-color: rgba(91, 33, 182, 0.22);
+  box-shadow:
+    0 14px 36px rgba(120, 80, 120, 0.2),
+    0 0 32px var(--memory-glow),
+    inset 0 1px 0 rgba(255, 255, 255, 0.75);
+}
+
+:global(.redesign-root[data-theme='light']) .eyebrow,
+:global(:root[data-redesign-theme='light']) .eyebrow {
+  color: rgba(82, 63, 92, 0.55);
+}
+
+:global(.redesign-root[data-theme='light']) .eyebrowTime,
+:global(:root[data-redesign-theme='light']) .eyebrowTime {
+  color: rgba(82, 63, 92, 0.7);
+}
+
+:global(.redesign-root[data-theme='light']) .quote,
+:global(:root[data-redesign-theme='light']) .quote,
+:global(.redesign-root[data-theme='light']) .milestoneTitle,
+:global(:root[data-redesign-theme='light']) .milestoneTitle {
+  color: rgba(36, 22, 49, 0.92);
+}
+
+:global(.redesign-root[data-theme='light']) .milestoneSubtitle,
+:global(:root[data-redesign-theme='light']) .milestoneSubtitle {
+  color: rgba(82, 63, 92, 0.7);
+}
+
+:global(.redesign-root[data-theme='light']) .hint,
+:global(:root[data-redesign-theme='light']) .hint {
+  color: rgba(82, 63, 92, 0.5);
+}
+
+:global(.redesign-root[data-theme='light']) .context,
+:global(:root[data-redesign-theme='light']) .context {
+  border-top-color: rgba(91, 33, 182, 0.1);
+}
+
+:global(.redesign-root[data-theme='light']) .contextEyebrow,
+:global(:root[data-redesign-theme='light']) .contextEyebrow {
+  color: rgba(82, 63, 92, 0.55);
+}
+
+:global(.redesign-root[data-theme='light']) .contextLine,
+:global(:root[data-redesign-theme='light']) .contextLine {
+  color: rgba(54, 38, 67, 0.78);
+}
+
+:global(.redesign-root[data-theme='light']) .contextAfter,
+:global(:root[data-redesign-theme='light']) .contextAfter {
+  color: rgba(82, 63, 92, 0.66);
+}
+
+@media (max-width: 520px) {
+  .body {
+    padding: 16px 18px 16px 14px;
+  }
+  .context {
+    padding: 14px 18px 16px 14px;
+  }
+  .card {
+    backdrop-filter: blur(4px);
+    -webkit-backdrop-filter: blur(4px);
+  }
+}

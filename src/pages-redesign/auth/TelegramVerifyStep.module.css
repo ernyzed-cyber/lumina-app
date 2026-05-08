@@ -1,0 +1,131 @@
+/**
+ * TelegramVerifyStep extras — code card + how-it-works + waiting spinner.
+ */
+
+.codeCard {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.06) 100%);
+  border: 1.5px solid rgba(139, 92, 246, 0.3);
+  border-radius: 16px;
+  padding: 24px;
+  text-align: center;
+  margin: 16px 0 24px;
+}
+
+.codeCard[data-expired='true'] {
+  background: rgba(220, 38, 38, 0.06);
+  border-color: rgba(220, 38, 38, 0.3);
+}
+
+.codeLabel {
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rd-text-secondary, #5b5b66);
+  margin-bottom: 8px;
+}
+
+.codeValue {
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: clamp(24px, 5vw, 32px);
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  color: #8b5cf6;
+  margin-bottom: 6px;
+}
+
+.codeCard[data-expired='true'] .codeValue {
+  color: #dc2626;
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+.codeNote {
+  font-size: 12px;
+  color: var(--rd-text-muted, #9a9aa4);
+}
+
+/* "Open bot" link styled as primary button */
+.btnLink {
+  text-decoration: none;
+  margin-bottom: 24px;
+}
+
+/* How it works block */
+.howItWorks {
+  margin: 24px 0;
+  padding: 16px 18px;
+  background: var(--rd-bg-surface-soft, #f7f7fa);
+  border-radius: 12px;
+}
+
+.howTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--rd-text-primary, #1a1a1f);
+  margin-bottom: 8px;
+}
+
+.howStep {
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--rd-text-secondary, #5b5b66);
+  padding: 2px 0;
+}
+
+/* Waiting indicator */
+.waiting {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 12px;
+  font-size: 14px;
+  color: var(--rd-text-secondary, #5b5b66);
+  margin-bottom: 16px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(139, 92, 246, 0.2);
+  border-top-color: #8b5cf6;
+  border-radius: 50%;
+  animation: spin 800ms linear infinite;
+}
+
+.skipNote {
+  margin-top: 4px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--rd-text-muted, #9a9aa4);
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spinner {
+    animation: none;
+  }
+}
+
+/* ── Dark mode (preview-toggle scope) ── */
+:global(.redesign-root[data-theme='dark']) .howItWorks {
+  background: var(--rd-bg-surface, #1a1922);
+}
+:global(.redesign-root[data-theme='dark']) .howTitle {
+  color: var(--rd-text-primary, #f5f5f7);
+}
+:global(.redesign-root[data-theme='dark']) .howStep,
+:global(.redesign-root[data-theme='dark']) .waiting {
+  color: var(--rd-text-secondary, rgba(245, 245, 247, 0.7));
+}
+:global(.redesign-root[data-theme='dark']) .codeLabel {
+  color: var(--rd-text-secondary, rgba(245, 245, 247, 0.7));
+}
+:global(.redesign-root[data-theme='dark']) .codeNote,
+:global(.redesign-root[data-theme='dark']) .skipNote {
+  color: var(--rd-text-muted, rgba(245, 245, 247, 0.45));
+}

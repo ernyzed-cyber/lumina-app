@@ -1,0 +1,16 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Landing — корневой контейнер, секции рендерятся стеком.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.root {
+  width: 100%;
+  background: var(--rd-bg-page);
+  color: var(--rd-text-primary);
+  overflow-x: hidden;
+  /* Smooth scroll для якорей */
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root { scroll-behavior: auto; }
+}

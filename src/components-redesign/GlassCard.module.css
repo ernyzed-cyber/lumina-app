@@ -1,0 +1,111 @@
+/* ═══════════════════════════════════════════════════════════════════
+   GlassCard — surface primitive.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rd-glass-card {
+  position: relative;
+  background: var(--rd-glass-bg);
+  backdrop-filter: blur(var(--rd-glass-blur)) saturate(var(--rd-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--rd-glass-blur)) saturate(var(--rd-glass-saturate));
+  border: 1px solid var(--rd-glass-border);
+  border-radius: var(--rd-radius-card);
+  box-shadow: var(--rd-shadow-sm);
+  overflow: hidden;
+  isolation: isolate;
+  transition:
+    box-shadow var(--rd-duration-default) var(--ease-smooth),
+    transform var(--rd-duration-default) var(--ease-spring),
+    border-color var(--rd-duration-default) var(--ease-smooth),
+    background var(--rd-duration-default) var(--ease-smooth);
+}
+
+/* Subtle inner highlight top edge — не перекрывает клики, под контентом */
+.rd-glass-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.08) 0%,
+    transparent 55%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Контент всегда выше декораций */
+.rd-glass-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Кликабельные as=button / as=a ── */
+.rd-glass-card[type='button'],
+button.rd-glass-card,
+a.rd-glass-card {
+  cursor: pointer;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  text-decoration: none;
+  -webkit-tap-highlight-color: transparent;
+}
+button.rd-glass-card { appearance: none; }
+.rd-glass-card:focus-visible {
+  outline: 2px solid var(--rd-text-accent);
+  outline-offset: 3px;
+}
+
+/* ── Hover lift ── */
+.rd-glass-card-hoverable:hover {
+  box-shadow: var(--rd-shadow-lg);
+  transform: translateY(-3px);
+  border-color: var(--rd-border-brand);
+}
+.rd-glass-card-hoverable:active {
+  transform: translateY(-1px);
+  box-shadow: var(--rd-shadow-md);
+}
+
+/* ── Padding presets ── */
+.rd-glass-card-pad-none { padding: 0; }
+.rd-glass-card-pad-sm   { padding: 12px; }
+.rd-glass-card-pad-md   { padding: 20px; }
+.rd-glass-card-pad-lg   { padding: 28px; }
+
+/* ── Solid variant (no blur) ── */
+.rd-glass-card-solid {
+  background: var(--rd-bg-surface);
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* ── Gradient border accent (via CSS mask, без z-index хака) ── */
+.rd-glass-card-accent {
+  border-color: transparent;
+}
+.rd-glass-card-accent::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  padding: 1.5px;
+  background: var(--gradient-primary);
+  -webkit-mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .rd-glass-card,
+  .rd-glass-card-hoverable:hover,
+  .rd-glass-card-hoverable:active {
+    transform: none !important;
+  }
+}

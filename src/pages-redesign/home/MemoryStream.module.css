@@ -1,0 +1,54 @@
+.stream {
+  position: relative;
+  z-index: 2;
+  width: min(720px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 80px;
+}
+
+.header {
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 6px;
+  color: rgba(244, 241, 251, 0.56);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  color: #f8f4ff;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(36px, 8vw, 56px);
+  line-height: 0.96;
+  letter-spacing: -0.05em;
+}
+
+.list {
+  display: grid;
+  gap: 14px;
+}
+
+:global(.redesign-root[data-theme='light']) .eyebrow,
+:global(:root[data-redesign-theme='light']) .eyebrow {
+  color: rgba(91, 58, 140, 0.62);
+}
+
+:global(.redesign-root[data-theme='light']) .title,
+:global(:root[data-redesign-theme='light']) .title {
+  color: #1a1625;
+}
+
+@media (min-width: 900px) {
+  .stream {
+    padding-bottom: 120px;
+  }
+
+  .list {
+    gap: 18px;
+  }
+}

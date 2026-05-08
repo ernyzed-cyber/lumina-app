@@ -1,0 +1,230 @@
+/* ═══════════════════════════════════════════════════════════════════
+   LUMINA REDESIGN — Дизайн-токены (Mamba-inspired)
+
+   Все токены применяются ТОЛЬКО внутри `.redesign-root`, чтобы не
+   ломать оригинальный дизайн. Импортируем базовые variables.css
+   (типографика, radius, easings, gradients остаются прежними)
+   и добавляем/переопределяем поверх.
+
+   Дефолт: LIGHT-тема (по решению владельца).
+   Dark — переключается через [data-theme="dark"] на body или html.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@import './variables.css';
+
+/* ─────────────────────────────────────────────────────────────────
+   1. ОБЩИЕ ТОКЕНЫ REDESIGN (не зависят от темы)
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root {
+  /* ── Glass-эффекты (ключевой приём редизайна) ── */
+  --rd-glass-blur: 24px;
+  --rd-glass-blur-strong: 32px;
+  --rd-glass-saturate: 180%;
+
+  /* ── Brand-soft заливки для hover/active состояний ── */
+  --rd-fill-brand-soft:        linear-gradient(135deg, rgba(139, 92, 246, 0.08) 0%, rgba(236, 72, 153, 0.08) 100%);
+  --rd-fill-brand-soft-hover:  linear-gradient(135deg, rgba(139, 92, 246, 0.14) 0%, rgba(236, 72, 153, 0.14) 100%);
+  --rd-fill-brand-soft-active: linear-gradient(135deg, rgba(139, 92, 246, 0.20) 0%, rgba(236, 72, 153, 0.20) 100%);
+
+  /* ── Spring-токены для framer-motion (ссылочно, читаются из JS через CSS-vars) ── */
+  --rd-spring-gentle-stiffness: 200;
+  --rd-spring-gentle-damping: 30;
+  --rd-spring-default-stiffness: 280;
+  --rd-spring-default-damping: 26;
+  --rd-spring-snappy-stiffness: 400;
+  --rd-spring-snappy-damping: 30;
+  --rd-spring-bouncy-stiffness: 320;
+  --rd-spring-bouncy-damping: 18;
+
+  /* ── Высота элементов навигации ── */
+  --rd-bottom-tab-height: 64px;
+  --rd-page-header-height: 52px;
+  --rd-sidebar-collapsed: 72px;
+  --rd-sidebar-expanded: 240px;
+
+  /* ── Радиусы (расширение) ── */
+  --rd-radius-pill: 9999px;
+  --rd-radius-input: 14px;
+  --rd-radius-card: 20px;
+  --rd-radius-card-lg: 28px;
+  --rd-radius-card-xl: 32px;
+
+  /* ── Status colors (нейтральные к теме, ниже доопределим темные оттенки) ── */
+  --rd-status-online: #22C55E;
+  --rd-status-online-glow: rgba(34, 197, 94, 0.45);
+  --rd-status-error: #EF4444;
+  --rd-status-error-soft: rgba(239, 68, 68, 0.12);
+  --rd-status-success: #10B981;
+  --rd-status-success-soft: rgba(16, 185, 129, 0.12);
+  --rd-status-warning: #F59E0B;
+  --rd-status-warning-soft: rgba(245, 158, 11, 0.12);
+  --rd-status-info: #3B82F6;
+  --rd-status-info-soft: rgba(59, 130, 246, 0.12);
+
+  /* ── Brand fills (без gradient, для solid-кнопок и accents) ── */
+  --rd-fill-brand: #8B5CF6;
+  --rd-fill-brand-hover: #7C3AED;
+  --rd-fill-brand-active: #6D28D9;
+  --rd-fill-destructive: #EF4444;
+  --rd-fill-destructive-hover: #DC2626;
+  --rd-fill-destructive-soft: rgba(239, 68, 68, 0.10);
+  --rd-fill-destructive-soft-hover: rgba(239, 68, 68, 0.18);
+
+  /* ── Brand borders ── */
+  --rd-border-brand: rgba(139, 92, 246, 0.4);
+  --rd-border-brand-strong: #8B5CF6;
+  --rd-border-destructive: rgba(239, 68, 68, 0.5);
+
+  /* ── Overlay strong (для модалок поверх медиа) ── */
+  --rd-bg-overlay-strong: rgba(14, 11, 26, 0.75);
+
+  /* ── Avatar ring colors (named) ── */
+  --rd-ring-brand: var(--gradient-primary);
+  --rd-ring-success: linear-gradient(135deg, #22C55E 0%, #10B981 100%);
+  --rd-ring-warm: linear-gradient(135deg, #F59E0B 0%, #EC4899 100%);
+  --rd-ring-cool: linear-gradient(135deg, #3B82F6 0%, #8B5CF6 100%);
+
+  /* ── Тайминги (используем существующие base + добавляем «slow» для hero reveal) ── */
+  --rd-duration-micro: 150ms;
+  --rd-duration-default: 280ms;
+  --rd-duration-slow: 600ms;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   2. LIGHT-ТЕМА (ДЕФОЛТ)
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root,
+.redesign-root[data-theme="light"],
+.redesign-root[data-theme="auto"],
+:root[data-redesign-theme="light"],
+:root[data-redesign-theme="auto"] {
+  color-scheme: light;
+
+  /* Фон */
+  --rd-bg-page: #FAFAFB;
+  --rd-bg-surface: #FFFFFF;
+  --rd-bg-surface-soft: #F4F1FB;
+  --rd-bg-surface-muted: #EDE9F4;
+  --rd-bg-elevated: #FFFFFF;
+  --rd-bg-overlay: rgba(26, 22, 37, 0.45);
+
+  /* Текст */
+  --rd-text-primary: #1A1625;
+  --rd-text-secondary: #6B6480;
+  --rd-text-muted: #9C95AD;
+  --rd-text-on-brand: #FFFFFF;
+  --rd-text-accent: #7C3AED;
+
+  /* Границы */
+  --rd-border-subtle: #EDE9F4;
+  --rd-border-default: #DCD4EA;
+  --rd-border-hover: rgba(139, 92, 246, 0.35);
+  --rd-border-active: rgba(236, 72, 153, 0.5);
+
+  /* Тени (мягкие, parящие — у Mamba ощущение «парящих» карточек) */
+  --rd-shadow-xs: 0 1px 2px rgba(26, 22, 37, 0.04);
+  --rd-shadow-sm: 0 2px 8px rgba(26, 22, 37, 0.06);
+  --rd-shadow-md: 0 8px 24px rgba(26, 22, 37, 0.08);
+  --rd-shadow-lg: 0 16px 48px rgba(26, 22, 37, 0.12);
+  --rd-shadow-xl: 0 24px 64px rgba(26, 22, 37, 0.16);
+  --rd-shadow-glow: 0 12px 40px rgba(139, 92, 246, 0.25);
+  --rd-shadow-glow-strong: 0 16px 56px rgba(139, 92, 246, 0.35), 0 8px 32px rgba(236, 72, 153, 0.25);
+
+  /* Glass — стеклянные поверхности */
+  --rd-glass-bg: rgba(255, 255, 255, 0.72);
+  --rd-glass-bg-strong: rgba(255, 255, 255, 0.85);
+  --rd-glass-border: rgba(255, 255, 255, 0.5);
+  --rd-glass-border-inner: rgba(139, 92, 246, 0.08);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   3. DARK-ТЕМА (переключаемая)
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root[data-theme="dark"],
+:root[data-redesign-theme="dark"] {
+  color-scheme: dark;
+
+  /* Фон */
+  --rd-bg-page: #0E0B1A;
+  --rd-bg-surface: #171328;
+  --rd-bg-surface-soft: #221B3A;
+  --rd-bg-surface-muted: #2B2247;
+  --rd-bg-elevated: #1F1934;
+  --rd-bg-overlay: rgba(0, 0, 0, 0.65);
+
+  /* Текст */
+  --rd-text-primary: #F4F1FB;
+  --rd-text-secondary: #A89FBE;
+  --rd-text-muted: #6B6480;
+  --rd-text-on-brand: #FFFFFF;
+  --rd-text-accent: #C4B5FD;
+
+  /* Границы */
+  --rd-border-subtle: rgba(139, 92, 246, 0.12);
+  --rd-border-default: rgba(139, 92, 246, 0.22);
+  --rd-border-hover: rgba(139, 92, 246, 0.4);
+  --rd-border-active: rgba(236, 72, 153, 0.55);
+
+  /* Тени (глубже, без brand-glow примеси в md/lg) */
+  --rd-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --rd-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+  --rd-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --rd-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+  --rd-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.6);
+  --rd-shadow-glow: 0 12px 40px rgba(139, 92, 246, 0.3);
+  --rd-shadow-glow-strong: 0 16px 56px rgba(139, 92, 246, 0.4), 0 8px 32px rgba(236, 72, 153, 0.3);
+
+  /* Glass */
+  --rd-glass-bg: rgba(23, 19, 40, 0.72);
+  --rd-glass-bg-strong: rgba(23, 19, 40, 0.85);
+  --rd-glass-border: rgba(255, 255, 255, 0.08);
+  --rd-glass-border-inner: rgba(139, 92, 246, 0.15);
+
+  /* Overlay & status overrides for dark */
+  --rd-bg-overlay-strong: rgba(0, 0, 0, 0.85);
+  --rd-status-online: #34D399;
+  --rd-status-error: #F87171;
+  --rd-status-success: #34D399;
+  --rd-status-warning: #FBBF24;
+  --rd-status-info: #60A5FA;
+
+  /* Brand fills in dark (slightly brighter so text-on-brand stays AAA) */
+  --rd-fill-brand: #A78BFA;
+  --rd-fill-brand-hover: #C4B5FD;
+  --rd-fill-brand-active: #DDD6FE;
+  --rd-border-brand: rgba(167, 139, 250, 0.5);
+  --rd-border-brand-strong: #A78BFA;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   4. AUTO-тема (system) — используется когда юзер выбрал «Auto»
+   ───────────────────────────────────────────────────────────────── */
+@media (prefers-color-scheme: dark) {
+  .redesign-root[data-theme="auto"],
+  :root[data-redesign-theme="auto"] {
+    color-scheme: dark;
+    --rd-bg-page: #0E0B1A;
+    --rd-bg-surface: #171328;
+    --rd-bg-surface-soft: #221B3A;
+    --rd-bg-surface-muted: #2B2247;
+    --rd-bg-elevated: #1F1934;
+    --rd-bg-overlay: rgba(0, 0, 0, 0.65);
+    --rd-text-primary: #F4F1FB;
+    --rd-text-secondary: #A89FBE;
+    --rd-text-muted: #6B6480;
+    --rd-text-accent: #C4B5FD;
+    --rd-border-subtle: rgba(139, 92, 246, 0.12);
+    --rd-border-default: rgba(139, 92, 246, 0.22);
+    --rd-border-hover: rgba(139, 92, 246, 0.4);
+    --rd-border-active: rgba(236, 72, 153, 0.55);
+    --rd-shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.3);
+    --rd-shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.35);
+    --rd-shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+    --rd-shadow-lg: 0 16px 48px rgba(0, 0, 0, 0.5);
+    --rd-shadow-xl: 0 24px 64px rgba(0, 0, 0, 0.6);
+    --rd-glass-bg: rgba(23, 19, 40, 0.72);
+    --rd-glass-bg-strong: rgba(23, 19, 40, 0.85);
+    --rd-glass-border: rgba(255, 255, 255, 0.08);
+    --rd-glass-border-inner: rgba(139, 92, 246, 0.15);
+  }
+}

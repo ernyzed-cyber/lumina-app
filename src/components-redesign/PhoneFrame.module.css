@@ -1,0 +1,175 @@
+/* ═══════════════════════════════════════════════════════════════════
+   PhoneFrame — iPhone-style mockup chrome.
+   Динамический size через CSS-переменную --rd-phone-w.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rd-phone {
+  --rd-phone-w: 280px;
+  --rd-phone-h: calc(var(--rd-phone-w) * 2.06); /* ≈ iPhone 14 Pro aspect */
+  --rd-phone-radius: calc(var(--rd-phone-w) * 0.13);
+  --rd-phone-bezel: calc(var(--rd-phone-w) * 0.028);
+
+  position: relative;
+  width: var(--rd-phone-w);
+  height: var(--rd-phone-h);
+  border-radius: var(--rd-phone-radius);
+  background: linear-gradient(145deg, #1F1B2E 0%, #2A2440 50%, #1A1625 100%);
+  padding: var(--rd-phone-bezel);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 0 0 2px rgba(139, 92, 246, 0.08),
+    0 32px 64px -16px rgba(15, 12, 30, 0.6),
+    0 16px 32px -8px rgba(139, 92, 246, 0.25);
+  flex-shrink: 0;
+  isolation: isolate;
+}
+
+/* Дополнительный rim — очень тонкий highlight под bezel */
+.rd-phone::before {
+  content: '';
+  position: absolute;
+  inset: 1px;
+  border-radius: calc(var(--rd-phone-radius) - 1px);
+  background: linear-gradient(135deg,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0) 30%,
+    rgba(255, 255, 255, 0) 70%,
+    rgba(255, 255, 255, 0.06) 100%
+  );
+  pointer-events: none;
+  z-index: 0;
+}
+
+/* Screen */
+.rd-phone-screen {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  border-radius: calc(var(--rd-phone-radius) - var(--rd-phone-bezel));
+  background: var(--rd-bg-page);
+  overflow: hidden;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Dynamic Island (iPhone 14+) — компактный pill сверху по центру */
+.rd-phone-island {
+  position: absolute;
+  top: calc(var(--rd-phone-w) * 0.025);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--rd-phone-w) * 0.32);
+  height: calc(var(--rd-phone-w) * 0.085);
+  background: #000;
+  border-radius: 999px;
+  z-index: 4;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+}
+
+/* Status bar */
+.rd-phone-statusbar {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: calc(var(--rd-phone-w) * 0.025) calc(var(--rd-phone-w) * 0.085)
+    calc(var(--rd-phone-w) * 0.018);
+  font-family: var(--font-display);
+  font-size: calc(var(--rd-phone-w) * 0.043);
+  font-weight: 700;
+  color: var(--rd-text-primary);
+  letter-spacing: -0.01em;
+  z-index: 3;
+  flex-shrink: 0;
+}
+
+.rd-phone-statusbar-time {
+  font-feature-settings: 'tnum' on;
+}
+
+.rd-phone-statusbar-icons {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--rd-phone-w) * 0.018);
+}
+
+.rd-phone-statusbar-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--rd-text-primary);
+  opacity: 0.92;
+}
+
+/* Battery */
+.rd-phone-battery {
+  display: inline-flex;
+  align-items: center;
+  width: calc(var(--rd-phone-w) * 0.075);
+  height: calc(var(--rd-phone-w) * 0.04);
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  padding: 1px;
+  position: relative;
+  opacity: 0.85;
+}
+
+.rd-phone-battery::after {
+  content: '';
+  position: absolute;
+  right: -3px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.5px;
+  height: 40%;
+  background: currentColor;
+  border-radius: 0 1px 1px 0;
+  opacity: 0.7;
+}
+
+.rd-phone-battery-fill {
+  height: 100%;
+  width: 80%;
+  background: currentColor;
+  border-radius: 1px;
+}
+
+/* Content area */
+.rd-phone-content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Home indicator — bottom pill */
+.rd-phone-indicator {
+  position: absolute;
+  bottom: calc(var(--rd-phone-w) * 0.025);
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(var(--rd-phone-w) * 0.34);
+  height: calc(var(--rd-phone-w) * 0.013);
+  background: var(--rd-text-primary);
+  opacity: 0.5;
+  border-radius: 999px;
+  z-index: 4;
+  pointer-events: none;
+}
+
+/* Tilt variants — used in Mockups parallax */
+.rd-phone-tilt-left {
+  transform: rotateY(8deg) rotateX(2deg) rotateZ(-1deg);
+  transform-style: preserve-3d;
+}
+
+.rd-phone-tilt-right {
+  transform: rotateY(-8deg) rotateX(2deg) rotateZ(1deg);
+  transform-style: preserve-3d;
+}
+
+.rd-phone-tilt-center {
+  transform: rotateY(0) rotateX(0) translateZ(20px);
+  transform-style: preserve-3d;
+}

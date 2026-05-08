@@ -1,0 +1,310 @@
+/* GiftSheet — floating panel above the composer dock.
+ *
+ * Mirrors EmojiSheet positioning (bottom: 92px, max-width: 688px) so the
+ * composer remains visible underneath. 6 gift tiles in a 3×2 grid; each tile
+ * is a glass disk with the lucide icon, name underneath, and a star price chip.
+ */
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  background: rgba(15, 13, 21, 0.4);
+  backdrop-filter: blur(2px);
+  -webkit-backdrop-filter: blur(2px);
+}
+
+.sheet {
+  position: fixed;
+  left: 50%;
+  bottom: 92px;
+  transform: translateX(-50%);
+  width: calc(100% - 32px);
+  max-width: 688px;
+  z-index: 51;
+  border-radius: 24px;
+  background: rgba(20, 17, 28, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.45);
+  padding: 16px 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.title {
+  font-family: var(--font-body);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(255, 244, 240, 0.5);
+  text-align: center;
+  margin: 0;
+}
+
+/* ── Category tabs ── */
+.tabs {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tabs::-webkit-scrollbar {
+  display: none;
+}
+
+.tab {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  border-radius: 999px;
+  padding: 6px 14px;
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+  color: rgba(255, 244, 240, 0.55);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 180ms var(--ease-smooth, ease), background 180ms var(--ease-smooth, ease);
+  flex: 1;
+}
+
+.tab:hover {
+  color: rgba(255, 244, 240, 0.85);
+}
+
+.tab:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.55);
+  outline-offset: 2px;
+}
+
+.tabActive {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.55), rgba(236, 72, 153, 0.5));
+  color: rgba(255, 244, 240, 0.98);
+  box-shadow: 0 4px 14px rgba(139, 92, 246, 0.25);
+}
+
+.tabActive:hover {
+  color: rgba(255, 244, 240, 1);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  /* Cap height so 5+ items can scroll without growing the sheet beyond
+   * what comfortably fits above the composer dock. */
+  max-height: 320px;
+  overflow-y: auto;
+  padding: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+}
+
+.grid::-webkit-scrollbar {
+  width: 4px;
+}
+
+.grid::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 4px;
+}
+
+.tile {
+  appearance: none;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  padding: 14px 10px 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition:
+    transform 180ms var(--ease-smooth, ease),
+    background 200ms var(--ease-smooth, ease),
+    border-color 200ms var(--ease-smooth, ease);
+}
+
+.tile:hover {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.25);
+  transform: translateY(-2px);
+}
+
+.tile:active {
+  transform: translateY(0) scale(0.97);
+}
+
+.tile:focus-visible {
+  outline: 2px solid rgba(139, 92, 246, 0.55);
+  outline-offset: 2px;
+}
+
+.disk {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: linear-gradient(
+    135deg,
+    rgba(139, 92, 246, 0.35),
+    rgba(236, 72, 153, 0.3)
+  );
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(255, 244, 240, 0.95);
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.08) inset,
+    0 4px 12px rgba(139, 92, 246, 0.25);
+}
+
+.diskEmoji {
+  font-size: 22px;
+  line-height: 1;
+  font-style: normal;
+}
+
+.name {
+  font-family: var(--font-body);
+  font-size: 12px;
+  font-weight: 500;
+  color: rgba(255, 244, 240, 0.78);
+  letter-spacing: 0.01em;
+  text-align: center;
+  line-height: 1.3;
+}
+
+.priceChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  padding: 2px 8px 2px 6px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  font-family: var(--font-body);
+  font-size: 10.5px;
+  font-weight: 600;
+  color: rgba(255, 244, 240, 0.7);
+  letter-spacing: 0.02em;
+}
+
+.priceStar {
+  font-size: 10px;
+  line-height: 1;
+  font-style: normal;
+}
+
+/* ── Light theme ── */
+:global(.redesign-root[data-theme='light']) .sheet,
+:global(:root[data-redesign-theme='light']) .sheet {
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(91, 33, 182, 0.1);
+  box-shadow: 0 16px 48px rgba(91, 33, 182, 0.18);
+}
+
+:global(.redesign-root[data-theme='light']) .title,
+:global(:root[data-redesign-theme='light']) .title {
+  color: rgba(82, 63, 92, 0.6);
+}
+
+:global(.redesign-root[data-theme='light']) .tabs,
+:global(:root[data-redesign-theme='light']) .tabs {
+  background: rgba(91, 33, 182, 0.04);
+  border-color: rgba(91, 33, 182, 0.08);
+}
+
+:global(.redesign-root[data-theme='light']) .tab,
+:global(:root[data-redesign-theme='light']) .tab {
+  color: rgba(82, 63, 92, 0.65);
+}
+
+:global(.redesign-root[data-theme='light']) .tab:hover,
+:global(:root[data-redesign-theme='light']) .tab:hover {
+  color: rgba(36, 22, 49, 0.9);
+}
+
+:global(.redesign-root[data-theme='light']) .tile,
+:global(:root[data-redesign-theme='light']) .tile {
+  background: rgba(91, 33, 182, 0.03);
+  border-color: rgba(91, 33, 182, 0.08);
+}
+
+:global(.redesign-root[data-theme='light']) .tile:hover,
+:global(:root[data-redesign-theme='light']) .tile:hover {
+  background: rgba(139, 92, 246, 0.1);
+  border-color: rgba(139, 92, 246, 0.3);
+}
+
+:global(.redesign-root[data-theme='light']) .name,
+:global(:root[data-redesign-theme='light']) .name {
+  color: rgba(36, 22, 49, 0.85);
+}
+
+:global(.redesign-root[data-theme='light']) .priceChip,
+:global(:root[data-redesign-theme='light']) .priceChip {
+  background: rgba(91, 33, 182, 0.06);
+  border-color: rgba(91, 33, 182, 0.12);
+  color: rgba(36, 22, 49, 0.7);
+}
+
+/* Light theme — focus rings deepen for contrast on light surface. */
+:global(.redesign-root[data-theme='light']) .tab:focus-visible,
+:global(:root[data-redesign-theme='light']) .tab:focus-visible,
+:global(.redesign-root[data-theme='light']) .tile:focus-visible,
+:global(:root[data-redesign-theme='light']) .tile:focus-visible {
+  outline-color: rgba(91, 33, 182, 0.5);
+}
+
+/* ── Reduced motion ── */
+@media (prefers-reduced-motion: reduce) {
+  .tile {
+    transition: none;
+  }
+  .tile:hover {
+    transform: none;
+  }
+}
+
+/* ── Responsive ── */
+@media (max-width: 520px) {
+  .sheet {
+    width: calc(100% - 24px);
+    bottom: 86px;
+    padding: 14px 14px 16px;
+    gap: 12px;
+  }
+  .tab {
+    padding: 5px 10px;
+    font-size: 11.5px;
+  }
+  .grid {
+    gap: 8px;
+    max-height: 280px;
+  }
+  .tile {
+    padding: 12px 8px 9px;
+    gap: 7px;
+  }
+  .disk {
+    width: 40px;
+    height: 40px;
+  }
+  .diskEmoji {
+    font-size: 20px;
+  }
+  .name {
+    font-size: 11.5px;
+  }
+}

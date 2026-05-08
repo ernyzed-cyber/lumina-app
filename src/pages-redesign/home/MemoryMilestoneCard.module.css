@@ -1,0 +1,62 @@
+.card {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 16px;
+  align-items: center;
+  border-radius: 28px;
+}
+
+.iconWrap {
+  display: grid;
+  width: 58px;
+  height: 58px;
+  place-items: center;
+  border-radius: 22px;
+  background: linear-gradient(135deg, #8b5cf6 0%, #ec4899 100%);
+  color: white;
+  box-shadow: 0 18px 40px rgba(139, 92, 246, 0.34);
+}
+
+.content {
+  min-width: 0;
+}
+
+.kicker {
+  margin: 0 0 5px;
+  color: rgba(244, 241, 251, 0.58);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.title {
+  margin: 0;
+  color: #f8f4ff;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(24px, 5vw, 34px);
+  line-height: 1.05;
+  letter-spacing: -0.03em;
+}
+
+.subtitle {
+  margin: 8px 0 0;
+  color: rgba(244, 241, 251, 0.66);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+:global(.redesign-root[data-theme='light']) .kicker,
+:global(:root[data-redesign-theme='light']) .kicker {
+  color: rgba(91, 58, 140, 0.62);
+}
+
+:global(.redesign-root[data-theme='light']) .title,
+:global(:root[data-redesign-theme='light']) .title {
+  color: #1a1625;
+}
+
+:global(.redesign-root[data-theme='light']) .subtitle,
+:global(:root[data-redesign-theme='light']) .subtitle {
+  color: rgba(74, 58, 110, 0.72);
+}

@@ -1,0 +1,154 @@
+/**
+ * ManifestoSection — короткий тёмный мост между светлыми секциями и финальным CTA.
+ *
+ * 4 строки-принципа Lumina, без декора, максимум типографики.
+ * BG: deep navy (#0F0E13), brand-gradient акценты на ключевом глаголе каждой строки.
+ */
+
+.section {
+  position: relative;
+  background: #0F0E13;
+  padding: clamp(96px, 16vh, 160px) 24px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.bg-glow-1,
+.bg-glow-2 {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(120px);
+  opacity: 0.35;
+  pointer-events: none;
+  z-index: 0;
+}
+.bg-glow-1 {
+  top: -10%;
+  left: -10%;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, #8B5CF6 0%, transparent 70%);
+}
+.bg-glow-2 {
+  bottom: -15%;
+  right: -10%;
+  width: 540px;
+  height: 540px;
+  background: radial-gradient(circle, #EC4899 0%, transparent 70%);
+}
+
+.inner {
+  position: relative;
+  z-index: 1;
+  max-width: 880px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 56px;
+  text-align: center;
+}
+
+.eyebrow {
+  font-family: var(--rd-font-body);
+  font-size: 13px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.title {
+  font-family: var(--rd-font-display);
+  font-size: clamp(36px, 5vw, 64px);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  font-weight: 700;
+  color: #FFFFFF;
+  margin: 0;
+}
+
+.title em {
+  font-style: italic;
+  background: linear-gradient(135deg, #C4B5FD 0%, #F472B6 60%, #FBB9DF 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* Custom ≠ glyph — built from = with diagonal strike.
+   Works in any font, doesn't rely on U+2260 metrics. */
+.neq {
+  position: relative;
+  display: inline-block;
+  width: 0.85em;
+  height: 0.85em;
+  margin: 0 0.15em -0.05em 0.15em;
+  vertical-align: -0.05em;
+}
+.neq::before,
+.neq::after {
+  content: '';
+  position: absolute;
+  left: 8%;
+  right: 8%;
+  height: 0.11em;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #C4B5FD 0%, #F472B6 60%, #FBB9DF 100%);
+}
+.neq::before {
+  top: 32%;
+}
+.neq::after {
+  top: 56%;
+}
+.neq > span {
+  position: absolute;
+  inset: 0;
+  display: block;
+}
+.neq > span::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 1.05em;
+  height: 0.1em;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #C4B5FD 0%, #F472B6 60%, #FBB9DF 100%);
+  transform: translate(-50%, -50%) rotate(-22deg);
+}
+
+.lines {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.line {
+  font-family: var(--rd-font-display);
+  font-size: clamp(20px, 2.4vw, 30px);
+  line-height: 1.4;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.92);
+  margin: 0;
+}
+
+.line strong {
+  font-weight: 700;
+  background: linear-gradient(90deg, #A78BFA 0%, #F472B6 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.closer {
+  font-family: var(--rd-font-display);
+  font-style: italic;
+  font-size: clamp(16px, 1.6vw, 20px);
+  color: rgba(255, 255, 255, 0.55);
+  margin: 0;
+  letter-spacing: 0.01em;
+}

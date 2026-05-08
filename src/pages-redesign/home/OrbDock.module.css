@@ -1,0 +1,112 @@
+.dock {
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 28px;
+  padding: 12px 22px 14px;
+  border-radius: var(--rd-radius-pill, 999px);
+  background-color: rgba(15, 13, 21, 0.82);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.01) 100%
+  );
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 12px 32px rgba(0, 0, 0, 0.45),
+    0 0 24px rgba(139, 92, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  backdrop-filter: blur(16px) saturate(1.2);
+  -webkit-backdrop-filter: blur(16px) saturate(1.2);
+}
+
+.item {
+  position: relative;
+  display: inline-grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 6px 2px 8px;
+  border-radius: 6px;
+  color: rgba(255, 244, 240, 0.42);
+  text-decoration: none;
+  outline: none;
+  transition: color 280ms ease;
+}
+
+.item:hover,
+.item:focus-visible {
+  color: rgba(255, 244, 240, 0.78);
+}
+
+.item:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.32);
+  outline-offset: 2px;
+}
+
+.label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 400;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.underline {
+  display: block;
+  width: 14px;
+  height: 1px;
+  background-color: currentColor;
+  opacity: 0;
+  transform: scaleX(0.5);
+  transition: opacity 280ms ease, transform 280ms ease, width 280ms ease;
+}
+
+.active {
+  color: rgba(255, 244, 240, 0.94);
+}
+
+.active .underline {
+  width: 22px;
+  opacity: 1;
+  transform: scaleX(1);
+  background-image: linear-gradient(90deg, #8b5cf6, #ec4899);
+  background-color: transparent;
+}
+
+/* Light theme */
+:global(.redesign-root[data-theme='light']) .dock,
+:global(:root[data-redesign-theme='light']) .dock {
+  background-color: rgba(255, 255, 255, 0.78);
+  background-image: linear-gradient(
+    180deg,
+    rgba(255, 255, 255, 0.5) 0%,
+    rgba(255, 255, 255, 0.2) 100%
+  );
+  border-color: rgba(91, 33, 182, 0.12);
+  box-shadow:
+    0 10px 28px rgba(120, 80, 120, 0.16),
+    0 0 18px rgba(139, 92, 246, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.7);
+}
+
+:global(.redesign-root[data-theme='light']) .item,
+:global(:root[data-redesign-theme='light']) .item {
+  color: rgba(54, 38, 67, 0.42);
+}
+
+:global(.redesign-root[data-theme='light']) .item:hover,
+:global(.redesign-root[data-theme='light']) .item:focus-visible,
+:global(:root[data-redesign-theme='light']) .item:hover,
+:global(:root[data-redesign-theme='light']) .item:focus-visible {
+  color: rgba(54, 38, 67, 0.86);
+}
+
+:global(.redesign-root[data-theme='light']) .active,
+:global(:root[data-redesign-theme='light']) .active {
+  color: rgba(54, 38, 67, 0.96);
+}
+
+:global(.redesign-root[data-theme='light']) .item:focus-visible,
+:global(:root[data-redesign-theme='light']) .item:focus-visible {
+  outline-color: rgba(139, 92, 246, 0.46);
+}

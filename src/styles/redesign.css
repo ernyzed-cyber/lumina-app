@@ -1,0 +1,154 @@
+/* ═══════════════════════════════════════════════════════════════════
+   LUMINA REDESIGN — Глобальные стили (scoped под `.redesign-root`)
+
+   Эти правила НЕ влияют на оригинальный код. Они применяются только
+   когда контейнер обёрнут классом `.redesign-root`. Это позволяет
+   держать новый дизайн в staging без риска сломать production-страницы.
+   ═══════════════════════════════════════════════════════════════════ */
+
+@import './variables-redesign.css';
+
+/* ─────────────────────────────────────────────────────────────────
+   Базовый layout redesign-страницы
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root {
+  font-family: var(--font-body);
+  background: var(--rd-bg-page);
+  color: var(--rd-text-primary);
+  min-height: 100vh;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+.redesign-root *,
+.redesign-root *::before,
+.redesign-root *::after {
+  box-sizing: border-box;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Типографика — Playfair display utility внутри redesign
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root .rd-display {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+}
+
+.redesign-root .rd-display-italic {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  line-height: 1.2;
+}
+
+.redesign-root .rd-body {
+  font-family: var(--font-body);
+  font-weight: 400;
+  letter-spacing: -0.005em;
+}
+
+.redesign-root .rd-mono {
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+}
+
+.redesign-root .rd-eyebrow {
+  font-family: var(--font-body);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--rd-text-secondary);
+}
+
+/* Gradient text helper (rebrand of existing) */
+.redesign-root .rd-gradient-text {
+  background: var(--gradient-primary);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Glass-utility (для floating panels, headers, action bars)
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root .rd-glass {
+  background: var(--rd-glass-bg);
+  backdrop-filter: blur(var(--rd-glass-blur)) saturate(var(--rd-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--rd-glass-blur)) saturate(var(--rd-glass-saturate));
+  border: 1px solid var(--rd-glass-border);
+}
+
+.redesign-root .rd-glass-strong {
+  background: var(--rd-glass-bg-strong);
+  backdrop-filter: blur(var(--rd-glass-blur-strong)) saturate(var(--rd-glass-saturate));
+  -webkit-backdrop-filter: blur(var(--rd-glass-blur-strong)) saturate(var(--rd-glass-saturate));
+  border: 1px solid var(--rd-glass-border);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Скроллбар внутри redesign — мягче, в палитре
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root ::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.redesign-root ::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.redesign-root ::-webkit-scrollbar-thumb {
+  background: var(--rd-border-default);
+  border-radius: var(--rd-radius-pill);
+}
+
+.redesign-root ::-webkit-scrollbar-thumb:hover {
+  background: var(--rd-border-hover);
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Focus-visible — brand-ring
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root :focus-visible {
+  outline: 2px solid var(--accent-purple);
+  outline-offset: 3px;
+  border-radius: 4px;
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Reduced motion внутри redesign
+   ───────────────────────────────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .redesign-root *,
+  .redesign-root *::before,
+  .redesign-root *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ─────────────────────────────────────────────────────────────────
+   Container / safe-area helpers
+   ───────────────────────────────────────────────────────────────── */
+.redesign-root .rd-container {
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 0 20px;
+}
+
+.redesign-root .rd-safe-top {
+  padding-top: env(safe-area-inset-top, 0);
+}
+
+.redesign-root .rd-safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 0);
+}

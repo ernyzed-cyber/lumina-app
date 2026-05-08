@@ -1,0 +1,57 @@
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, #8b5cf6, #ec4899);
+  opacity: 0.9;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: rgba(244, 241, 251, 0.68);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.quote {
+  margin: 14px 0 0;
+  color: #f8f4ff;
+  font-family: 'Playfair Display', Georgia, serif;
+  font-size: clamp(24px, 5.6vw, 38px);
+  font-style: italic;
+  line-height: 1.12;
+  letter-spacing: -0.03em;
+}
+
+.attribution {
+  margin: 18px 0 0;
+  color: rgba(244, 241, 251, 0.62);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+:global(.redesign-root[data-theme='light']) .eyebrow,
+:global(:root[data-redesign-theme='light']) .eyebrow {
+  color: rgba(91, 58, 140, 0.72);
+}
+
+:global(.redesign-root[data-theme='light']) .quote,
+:global(:root[data-redesign-theme='light']) .quote {
+  color: #1a1625;
+}
+
+:global(.redesign-root[data-theme='light']) .attribution,
+:global(:root[data-redesign-theme='light']) .attribution {
+  color: rgba(74, 58, 110, 0.72);
+}

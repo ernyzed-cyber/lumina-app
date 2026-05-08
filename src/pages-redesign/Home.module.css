@@ -1,0 +1,75 @@
+.page {
+  position: relative;
+  min-height: calc(100dvh - 57px);
+  overflow: hidden;
+  background-color: #050310;
+  background-image: linear-gradient(180deg, #08051a 0%, #0a0618 50%, #050210 100%);
+  isolation: isolate;
+}
+
+.shell {
+  position: relative;
+  z-index: 3;
+  display: grid;
+  min-height: calc(100dvh - 57px);
+  grid-template-rows: 1fr auto auto;
+  place-items: center;
+  gap: clamp(22px, 4vh, 42px);
+  padding: clamp(28px, 6vh, 60px) 20px max(28px, env(safe-area-inset-bottom));
+}
+
+.identity {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  max-width: min(520px, 88vw);
+  text-align: center;
+}
+
+.name {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.94);
+  font-family: var(--font-display);
+  font-size: clamp(20px, 2.6vw, 26px);
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.005em;
+  line-height: 1.2;
+  text-shadow: 0 1px 24px rgba(0, 0, 0, 0.6);
+}
+
+.state {
+  margin: 0;
+  color: rgba(255, 244, 240, 0.55);
+  font-size: clamp(13px, 1.6vw, 15px);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.55;
+  text-shadow: 0 1px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Light theme — dawn sky ─── */
+:global(.redesign-root[data-theme='light']) .page,
+:global(:root[data-redesign-theme='light']) .page {
+  background-color: #fbf3ee;
+  background-image: linear-gradient(180deg, #fef7f3 0%, #fbeef0 55%, #f5e8ee 100%);
+}
+
+:global(.redesign-root[data-theme='light']) .name,
+:global(:root[data-redesign-theme='light']) .name {
+  color: rgba(54, 38, 67, 0.88);
+  text-shadow: 0 1px 12px rgba(255, 255, 255, 0.6);
+}
+
+:global(.redesign-root[data-theme='light']) .state,
+:global(:root[data-redesign-theme='light']) .state {
+  color: rgba(82, 63, 92, 0.6);
+  text-shadow: none;
+}
+
+@media (max-width: 520px) {
+  .shell {
+    gap: 22px;
+    padding-inline: 16px;
+  }
+}

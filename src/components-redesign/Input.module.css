@@ -1,0 +1,218 @@
+/* ═══════════════════════════════════════════════════════════════════
+   Input — primitive styles. Floating label + autofill fix.
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rd-field {
+  width: 100%;
+}
+
+.rd-field-shell {
+  position: relative;
+  width: 100%;
+}
+
+/* The actual <input> / <textarea> */
+.rd-input {
+  width: 100%;
+  box-sizing: border-box;
+  background: var(--rd-bg-surface);
+  border: 1.5px solid var(--rd-border-default);
+  border-radius: var(--rd-radius-input);
+  color: var(--rd-text-primary);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.4;
+  padding: 22px 16px 8px;
+  outline: none;
+  transition:
+    border-color var(--rd-duration-micro) var(--ease-smooth),
+    box-shadow var(--rd-duration-micro) var(--ease-smooth),
+    background var(--rd-duration-micro) var(--ease-smooth);
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.rd-input::placeholder {
+  color: transparent; /* hidden — label acts as placeholder */
+}
+
+.rd-input:focus {
+  border-color: var(--rd-border-brand);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15);
+  background: var(--rd-bg-surface);
+}
+
+/* Chrome / Safari autofill fix:
+   • заставляем фон оставаться surface;
+   • триггерим floating label через :-webkit-autofill (он матчится даже когда value пустой). */
+.rd-input:-webkit-autofill,
+.rd-input:-webkit-autofill:hover,
+.rd-input:-webkit-autofill:focus {
+  -webkit-text-fill-color: var(--rd-text-primary);
+  -webkit-box-shadow: 0 0 0 1000px var(--rd-bg-surface) inset;
+  caret-color: var(--rd-text-primary);
+  transition: background-color 999999s ease-in-out 0s; /* блокируем yellow flash */
+}
+
+/* Floating label */
+.rd-label {
+  position: absolute;
+  left: 16px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 15px;
+  color: var(--rd-text-muted);
+  pointer-events: none;
+  transition:
+    top var(--rd-duration-micro) var(--ease-smooth),
+    font-size var(--rd-duration-micro) var(--ease-smooth),
+    color var(--rd-duration-micro) var(--ease-smooth),
+    transform var(--rd-duration-micro) var(--ease-smooth);
+  line-height: 1;
+  background: transparent;
+  max-width: calc(100% - 32px);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* textarea: label starts higher (no vertical centering) */
+.rd-field-textarea .rd-label {
+  top: 18px;
+  transform: none;
+}
+
+/* iconLeft сдвигает label вправо */
+.rd-input-has-left ~ .rd-label {
+  left: 44px;
+}
+
+/* Floated state: focus / has value / autofilled */
+.rd-input:focus ~ .rd-label,
+.rd-input:not(:placeholder-shown) ~ .rd-label,
+.rd-input:-webkit-autofill ~ .rd-label {
+  top: 8px;
+  transform: none;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--rd-text-accent);
+}
+
+/* ── States ── */
+
+.rd-field-error .rd-input {
+  border-color: var(--rd-status-error);
+}
+.rd-field-error .rd-input:focus {
+  border-color: var(--rd-status-error);
+  box-shadow: 0 0 0 3px var(--rd-status-error-soft);
+}
+.rd-field-error .rd-input:focus ~ .rd-label,
+.rd-field-error .rd-input:not(:placeholder-shown) ~ .rd-label {
+  color: var(--rd-status-error);
+}
+
+.rd-field-success .rd-input {
+  border-color: var(--rd-status-success);
+}
+.rd-field-success .rd-input:focus {
+  border-color: var(--rd-status-success);
+  box-shadow: 0 0 0 3px var(--rd-status-success-soft);
+}
+.rd-field-success .rd-input:focus ~ .rd-label,
+.rd-field-success .rd-input:not(:placeholder-shown) ~ .rd-label {
+  color: var(--rd-status-success);
+}
+
+/* disabled */
+.rd-input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  background: var(--rd-bg-surface-muted);
+}
+
+/* ── Icon slots ── */
+.rd-input-has-left  { padding-left: 44px; }
+.rd-input-has-right { padding-right: 44px; }
+
+.rd-field-icon {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  color: var(--rd-text-muted);
+  pointer-events: none; /* default: декоративные иконки не интерактивны */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 0;
+  width: 24px;
+  height: 24px;
+}
+.rd-field-icon-left  { left: 14px; }
+.rd-field-icon-right { right: 14px; }
+
+/* Textarea: иконки в первой строке, не центрируются вертикально */
+.rd-field-textarea .rd-field-icon {
+  top: 18px;
+  transform: none;
+}
+
+/* Кнопочный slot (password toggle, clear, custom button) */
+.rd-field-icon-button {
+  pointer-events: auto;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  margin: 0;
+  border-radius: 8px;
+  width: 32px;
+  height: 32px;
+  color: var(--rd-text-muted);
+  transition: color var(--rd-duration-micro) var(--ease-smooth),
+              background var(--rd-duration-micro) var(--ease-smooth);
+}
+.rd-field-icon-button:hover {
+  color: var(--rd-text-primary);
+  background: var(--rd-fill-brand-soft);
+}
+.rd-field-icon-button:focus-visible {
+  outline: 2px solid var(--rd-text-accent);
+  outline-offset: 2px;
+}
+
+/* ── Helper / error text ── */
+.rd-field-hint {
+  margin: 6px 4px 0;
+  font-size: 12px;
+  color: var(--rd-text-muted);
+  line-height: 1.4;
+}
+.rd-field-error .rd-field-hint  { color: var(--rd-status-error); }
+.rd-field-success .rd-field-hint { color: var(--rd-status-success); }
+
+/* ── Textarea ── */
+.rd-input-textarea {
+  min-height: 100px;
+  resize: vertical;
+  padding-top: 26px;
+}
+
+/* ── Size variants ── */
+.rd-field-sm .rd-input {
+  font-size: 13px;
+  padding: 18px 12px 6px;
+}
+.rd-field-sm .rd-label { font-size: 13px; left: 12px; }
+.rd-field-sm .rd-input-has-left ~ .rd-label { left: 38px; }
+.rd-field-sm .rd-input:focus ~ .rd-label,
+.rd-field-sm .rd-input:not(:placeholder-shown) ~ .rd-label,
+.rd-field-sm .rd-input:-webkit-autofill ~ .rd-label {
+  font-size: 10px;
+  top: 6px;
+}
+.rd-field-sm .rd-input-has-left  { padding-left: 36px; }
+.rd-field-sm .rd-input-has-right { padding-right: 36px; }
+.rd-field-sm .rd-field-icon-left { left: 10px; }
+.rd-field-sm .rd-field-icon-right { right: 10px; }

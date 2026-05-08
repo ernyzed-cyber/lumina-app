@@ -1,0 +1,39 @@
+/* ═══════════════════════════════════════════════════════════════════
+   NavShell — responsive layout wrapper.
+   Mobile: content + BottomTabBar внизу
+   Desktop: SidebarNav слева + scrollable content справа
+   ═══════════════════════════════════════════════════════════════════ */
+
+.rd-nav-shell {
+  display: flex;
+  min-height: 100dvh;
+  background: var(--rd-bg-page);
+  color: var(--rd-text-primary);
+}
+
+/* Mobile layout: вертикальный stack, content + bottom tabbar */
+.rd-nav-shell-mobile {
+  flex-direction: column;
+}
+
+.rd-nav-shell-mobile .rd-nav-shell-content {
+  flex: 1;
+  min-height: 0;
+  /* нижний padding под tabbar высотой ~64px + safe-area */
+  padding-bottom: calc(72px + env(safe-area-inset-bottom));
+}
+
+/* Desktop layout: sidebar + content */
+.rd-nav-shell-desktop {
+  flex-direction: row;
+}
+
+.rd-nav-shell-desktop .rd-nav-shell-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.rd-nav-shell-content {
+  display: flex;
+  flex-direction: column;
+}

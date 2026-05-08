@@ -1,0 +1,57 @@
+.progressContainer {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin-top: 0.5rem;
+}
+
+.hint {
+  font-family: var(--font-body);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 0.5rem;
+  opacity: 0.8;
+}
+
+.hairline {
+  height: 1px;
+  width: 100%;
+  background: var(--brand-gradient);
+  transform-origin: left center;
+  transition: transform 0.3s ease;
+}
+
+.banner {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 1rem 0;
+}
+
+.bannerRule {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, var(--border-subtle), transparent);
+}
+
+.bannerContent {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1.5rem 0;
+}
+
+.bannerTitle {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-tertiary);
+  margin-bottom: 0.25rem;
+}
+
+.bannerTimer {
+  font-family: var(--font-body);
+  font-size: 13px;
+  color: var(--text-secondary);
+}
