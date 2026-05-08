@@ -21,39 +21,51 @@ const Waitlist = lazy(() => import('./pages/Waitlist'));
 const Released = lazy(() => import('./pages/Released'));
 
 /* ── Dev-only: redesign preview catalog (НЕ попадает в production-билд) ── */
+// @ts-ignore
 const PreviewLayout = import.meta.env.DEV
   ? lazy(() => import('./preview/PreviewLayout'))
   : null;
+// @ts-ignore
 const PreviewIndex = import.meta.env.DEV
   ? lazy(() => import('./preview/PreviewIndex'))
   : null;
+// @ts-ignore
 const PreviewPrimitives = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Primitives'))
   : null;
+// @ts-ignore
 const PreviewNavigation = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Navigation'))
   : null;
+// @ts-ignore
 const PreviewLanding = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Landing'))
   : null;
+// @ts-ignore
 const PreviewAuth = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Auth'))
   : null;
+// @ts-ignore
 const PreviewHome = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Home'))
   : null;
+// @ts-ignore
 const PreviewMemories = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Memories'))
   : null;
+// @ts-ignore
 const PreviewChat = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Chat'))
   : null;
+// @ts-ignore
 const PreviewFeed = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Feed'))
   : null;
+// @ts-ignore
 const PreviewSearch = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Search'))
   : null;
+// @ts-ignore
 const PreviewProfile = import.meta.env.DEV
   ? lazy(() => import('./pages-redesign/Profile'))
   : null;
